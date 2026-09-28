@@ -10,7 +10,7 @@ export default function FeaturedStory({
       type="button"
       onClick={() =>
         window.dispatchEvent(
-          new CustomEvent("last24:open-story", {
+          new CustomEvent("last247:open-story", {
             detail: story,
           }),
         )

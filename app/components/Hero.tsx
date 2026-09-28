@@ -49,7 +49,7 @@ export default function Hero() {
           <p className="text-base leading-relaxed text-muted sm:text-lg sm:leading-8">
             The world moves fast. You don&apos;t need to read everything.{" "}
             <span className="font-medium text-foreground">
-              Last 24 turns thousands of global feeds into clear, high-signal briefings.
+              Last247 turns thousands of global feeds into clear, high-signal briefings.
             </span>
           </p>
 

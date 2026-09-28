@@ -36,15 +36,15 @@ export default function Navbar() {
         <Link
           href="/"
           className="group flex items-center gap-2.5"
-          aria-label="Last 24 home"
+          aria-label="Last247 home"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-xs font-bold text-background transition-transform duration-300 group-hover:scale-105 group-hover:-rotate-6">
-            24
+          <div className="flex h-7 px-1.5 items-center justify-center rounded-lg bg-foreground text-xs font-bold text-background transition-transform duration-300 group-hover:scale-105 group-hover:-rotate-6">
+            24/7
           </div>
 
           <div className="leading-none">
             <span className="block text-sm font-bold tracking-tight">
-              Last 24
+              Last247
             </span>
           </div>
         </Link>

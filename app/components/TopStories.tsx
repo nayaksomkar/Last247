@@ -253,13 +253,13 @@ export default function TopStories() {
     };
 
     window.addEventListener(
-      "last24:open-story",
+      "last247:open-story",
       handler
     );
 
     return () => {
       window.removeEventListener(
-        "last24:open-story",
+        "last247:open-story",
         handler
       );
     };

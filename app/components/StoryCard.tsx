@@ -33,7 +33,7 @@ export default function StoryCard({
       type="button"
       onClick={() =>
         window.dispatchEvent(
-          new CustomEvent("last24:open-story", {
+          new CustomEvent("last247:open-story", {
             detail: {
               category,
               title,

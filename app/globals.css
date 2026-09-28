@@ -76,7 +76,7 @@ body {
   color: white;
 }
 
-/* Last 24 — editorial story feed */
+/* Last247 — editorial story feed */
 .stories-scroll {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--foreground) 18%, transparent)

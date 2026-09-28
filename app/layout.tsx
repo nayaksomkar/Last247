@@ -9,7 +9,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Last 24 — What mattered in the last 24 hours",
+  title: "Last247 — What mattered in the last 24 hours",
   description:
     "Understand the world's most important stories from the last 24 hours through concise AI-powered summaries.",
 };

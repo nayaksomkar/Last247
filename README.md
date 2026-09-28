@@ -1,4 +1,4 @@
-# Last 24
+# Last247
 
 > 24-hour global news briefing web app built with **Next.js 16**, **React 19**, and **Tailwind CSS v4**.
 
@@ -50,7 +50,7 @@ flowchart LR
 | :--- | :--- | :--- | :--- |
 | **1. Page Load** | Opens `http://localhost:3000` | `Navbar`, `Hero`, `TopStories` | Reads theme from `localStorage`. Client calls `/api/news`. |
 | **2. Feed Display** | Browses news list | `FeaturedStory`, `StoryCard` | Lead story shown on left; 19 stories listed on right. |
-| **3. Open Story** | Clicks any story card | `NewsReaderAside` | Dispatches `last24:open-story`. Drawer slides in; page scroll locks. |
+| **3. Open Story** | Clicks any story card | `NewsReaderAside` | Dispatches `last247:open-story`. Drawer slides in; page scroll locks. |
 | **4. Close Story** | Presses `Esc` or clicks backdrop | `NewsReaderAside` | Drawer closes; page scroll unlocks. |
 | **5. Switch Theme** | Clicks sun/moon icon | `Navbar` | Toggles `.dark` class on root HTML; updates `localStorage`. |
 
@@ -83,7 +83,7 @@ flowchart LR
 - **Trigger Story Drawer**: Dispatch the custom window event from any card component:
   ```ts
   window.dispatchEvent(
-    new CustomEvent("last24:open-story", { detail: storyObject })
+    new CustomEvent("last247:open-story", { detail: storyObject })
   );
   ```
 - **Theming & Colors**: Tailwind CSS v4 in `app/globals.css`. Use beat color classes:

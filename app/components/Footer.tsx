@@ -7,11 +7,11 @@ export default function Footer() {
         
         {/* Left: Brand badge & crafted note */}
         <div className="flex items-center gap-2.5 text-xs text-muted">
-          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-foreground text-[10px] font-bold text-background select-none">
-            24
+          <span className="flex h-5 px-1 items-center justify-center rounded-md bg-foreground text-[9px] font-bold text-background select-none">
+            24/7
           </span>
           <p className="tracking-wider">
-            Built <span className="font-semibold text-foreground">Last 24</span> with{" "}
+            Built <span className="font-semibold text-foreground">Last247</span> with{" "}
             <Heart className="inline h-3 w-3 fill-red text-red transition-transform hover:scale-125" />
           </p>
         </div>
