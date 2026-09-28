@@ -31,12 +31,6 @@ export default function Footer() {
             Feed
           </a>
           <a
-            href="#meet"
-            className="rounded-full px-3 py-1 font-medium text-muted transition-colors hover:bg-foreground/5 hover:text-foreground"
-          >
-            Meet
-          </a>
-          <a
             href="https://devakashsharma.netlify.app/"
             target="_blank"
             rel="noopener noreferrer"

@@ -1,29 +1,59 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Clock3, Database, RefreshCw } from "lucide-react";
 import FeaturedStory from "./FeaturedStory";
 import StoryCard from "./StoryCard";
 import NewsReaderAside, { type NewsStory } from "./NewsReaderAside";
 
-type NewsAPIArticle = {
+/**
+ * Normalized article as delivered by the Last247 backend (`GET /api/news`),
+ * which reads stored news from the database. Which provider originally supplied
+ * a story is irrelevant here — the UI only renders the normalized shape.
+ */
+type NewsArticle = {
   source: {
     id: string | null;
     name: string;
   };
-  author: string | null;
   title: string;
   description: string | null;
   url: string;
   urlToImage: string | null;
   publishedAt: string;
   content: string | null;
+  author: string | null;
 };
 
-type NewsAPIResponse = {
+type NewsFeedResponse = {
   status: string;
   totalResults: number;
-  articles: NewsAPIArticle[];
+  articles: NewsArticle[];
+  meta?: {
+    counts?: { returned: number; skipped: number };
+  };
 };
+
+/**
+ * Database-backed feed states.
+ * - `loading`     request in flight
+ * - `ready`       articles received
+ * - `empty`       database holds no news yet (awaiting the next ingestion cycle)
+ * - `unavailable` database could not be read
+ * - `invalid`     rows exist but none of them could be rendered
+ */
+type FeedState = "loading" | "ready" | "empty" | "unavailable" | "invalid";
+
+/** Final render guard against malformed records in the payload. */
+function isRenderableArticle(article: NewsArticle): boolean {
+  return (
+    Boolean(article) &&
+    typeof article.title === "string" &&
+    article.title.trim().length > 0 &&
+    typeof article.url === "string" &&
+    !Number.isNaN(new Date(article.publishedAt).getTime())
+  );
+}
 
 function getCategory(title: string, description: string | null): NewsStory["category"] {
   const text = `${title} ${description ?? ""}`.toLowerCase();
@@ -137,7 +167,7 @@ function getTimeAgo(date: string) {
   return `${days}d ago`;
 }
 
-function getReadTime(article: NewsAPIArticle) {
+function getReadTime(article: NewsArticle) {
   const text = `${article.description ?? ""} ${article.content ?? ""}`;
 
   const words = text.trim().split(/\s+/).filter(Boolean).length;
@@ -151,7 +181,7 @@ function getReadTime(article: NewsAPIArticle) {
   return `${minutes} min read`;
 }
 
-function convertArticleToStory(article: NewsAPIArticle): NewsStory {
+function convertArticleToStory(article: NewsArticle): NewsStory {
   const category = getCategory(
     article.title,
     article.description
@@ -201,49 +231,59 @@ export default function TopStories() {
   const [selectedStory, setSelectedStory] =
     useState<NewsStory | null>(null);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [feedState, setFeedState] = useState<FeedState>("loading");
+  const [skipped, setSkipped] = useState(0);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    async function fetchNews() {
-      try {
-        setLoading(true);
-        setError(null);
+    let cancelled = false;
 
-        const response = await fetch("/api/news");
+    async function loadNews() {
+      setFeedState("loading");
+
+      try {
+        // The only data source. Last247 never calls a news provider itself.
+        const response = await fetch("/api/news", { cache: "no-store" });
 
         if (!response.ok) {
-          throw new Error("Failed to fetch news");
+          if (!cancelled) setFeedState("unavailable");
+          return;
         }
 
-        const data: NewsAPIResponse = await response.json();
+        const data: NewsFeedResponse = await response.json();
 
-        if (data.status !== "ok") {
-          throw new Error("News API returned an error");
+        if (data?.status !== "ok" || !Array.isArray(data?.articles)) {
+          if (!cancelled) setFeedState("unavailable");
+          return;
         }
 
-        const convertedStories = data.articles
-          .filter((article) => article.title)
-          .filter(
-            (article) =>
-              article.title !== "[Removed]"
-          )
-          .map(convertArticleToStory);
+        const renderable = data.articles.filter(isRenderableArticle);
+        const dropped = data.meta?.counts?.skipped ?? 0;
+        const skippedCount = dropped + (data.articles.length - renderable.length);
 
-        setStories(convertedStories);
-      } catch (error) {
-        console.error("News fetching error:", error);
+        if (cancelled) return;
 
-        setError(
-          "We couldn't load the latest stories. Please try again."
+        setStories(renderable.map(convertArticleToStory));
+        setSkipped(skippedCount);
+        setFeedState(
+          renderable.length > 0
+            ? "ready"
+            : skippedCount > 0
+              ? "invalid"
+              : "empty"
         );
-      } finally {
-        setLoading(false);
+      } catch {
+        if (!cancelled) setFeedState("unavailable");
       }
     }
 
-    fetchNews();
-  }, []);
+    loadNews();
+
+    return () => {
+      cancelled = true;
+    };
+    // `attempt` re-runs the request when the user retries.
+  }, [attempt]);
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -286,24 +326,42 @@ export default function TopStories() {
               </h2>
 
               <p className="mt-3 max-w-2xl text-sm leading-6 text-muted sm:text-base">
-                The highest-signal stories from the last 24 hours,
-                distilled into the essentials.
+                The most important stories from the last 24 hours,
+                collected continuously and kept up to date.
               </p>
             </div>
 
-            <div className="flex items-center gap-3 text-xs text-muted">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green" />
+            <div className="flex flex-col items-start gap-2 sm:items-end">
+              <div className="flex items-center gap-3 text-xs text-muted">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    feedState === "ready"
+                      ? "animate-pulse bg-green"
+                      : "bg-muted"
+                  }`}
+                />
 
-              <span>
-                {loading
-                  ? "Fetching latest stories..."
-                  : `${stories.length} stories available`}
-              </span>
+                <span>
+                  {feedState === "loading"
+                    ? "Loading news..."
+                    : feedState === "ready"
+                      ? `${stories.length} stories available`
+                      : feedState === "unavailable"
+                        ? "Feed unavailable"
+                        : "No stories yet"}
+                </span>
+              </div>
+
+              {feedState === "ready" && skipped > 0 && (
+                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  {skipped} record{skipped !== 1 ? "s" : ""} skipped
+                </span>
+              )}
             </div>
           </div>
 
           {/* Loading */}
-          {loading && (
+          {feedState === "loading" && (
             <div className="mt-9 grid gap-4 lg:grid-cols-12">
 
               <div className="min-h-115 animate-pulse rounded-3xl border border-border/70 bg-card/50 lg:col-span-7" />
@@ -320,25 +378,65 @@ export default function TopStories() {
             </div>
           )}
 
-          {/* Error */}
-          {!loading && error && (
-            <div className="mt-9 rounded-2xl border border-red/20 bg-red/5 p-8 text-center">
-              <p className="font-semibold text-red">
-                {error}
+          {/* Database unavailable */}
+          {feedState === "unavailable" && (
+            <div className="mt-9 rounded-2xl border border-border/70 bg-card/50 p-8 text-center">
+              <Database size={20} className="mx-auto text-muted" />
+
+              <p className="mt-4 font-semibold text-foreground">
+                The news feed is temporarily unavailable
+              </p>
+
+              <p className="mt-2 text-sm text-muted">
+                We couldn&apos;t reach the news store. Please try again in a
+                moment.
               </p>
 
               <button
                 type="button"
-                onClick={() => window.location.reload()}
-                className="mt-4 rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold transition hover:border-red/30"
+                onClick={() => setAttempt((value) => value + 1)}
+                className="mt-5 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold transition hover:border-blue/30"
               >
+                <RefreshCw size={12} />
                 Try again
               </button>
             </div>
           )}
 
+          {/* Database has no news yet */}
+          {feedState === "empty" && (
+            <div className="mt-9 rounded-2xl border border-border/70 bg-card/50 p-8 text-center">
+              <Clock3 size={20} className="mx-auto text-muted" />
+
+              <p className="mt-4 font-semibold text-foreground">
+                No stories have been collected yet
+              </p>
+
+              <p className="mt-2 text-sm text-muted">
+                The feed is empty for now. Stories appear here as soon as the
+                next collection cycle finishes.
+              </p>
+            </div>
+          )}
+
+          {/* Stored records could not be rendered */}
+          {feedState === "invalid" && (
+            <div className="mt-9 rounded-2xl border border-border/70 bg-card/50 p-8 text-center">
+              <Clock3 size={20} className="mx-auto text-muted" />
+
+              <p className="mt-4 font-semibold text-foreground">
+                No stories could be displayed
+              </p>
+
+              <p className="mt-2 text-sm text-muted">
+                The most recent records are incomplete. Fresh stories will
+                appear once the next collection cycle finishes.
+              </p>
+            </div>
+          )}
+
           {/* Stories */}
-          {!loading && !error && stories.length > 0 && (
+          {feedState === "ready" && stories.length > 0 && (
             <div className="mt-9 grid gap-4 lg:grid-cols-12 lg:items-stretch">
 
               {/* Featured story */}
@@ -385,17 +483,8 @@ export default function TopStories() {
             </div>
           )}
 
-          {/* No stories */}
-          {!loading && !error && stories.length === 0 && (
-            <div className="mt-9 rounded-2xl border border-border bg-card p-10 text-center">
-              <p className="text-muted">
-                No stories were found.
-              </p>
-            </div>
-          )}
-
           {/* Bottom meta */}
-          {!loading && !error && stories.length > 0 && (
+          {feedState === "ready" && stories.length > 0 && (
             <div className="mt-8 flex flex-col gap-3 border-t border-border/60 pt-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
 
               <span>

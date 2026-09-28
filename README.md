@@ -1,123 +1,169 @@
 # Last247
 
-> 24-hour global news briefing web app built with **Next.js 16**, **React 19**, and **Tailwind CSS v4**.
+> A 24-hour global news briefing **frontend/UI** project built with **Next.js 16**, **React 19**, **TypeScript**, and **Tailwind CSS v4**.
+
+This repository is a **local development UI project**. It runs entirely on your machine — no Docker, no cloud account, no production infrastructure.
 
 ---
 
 ## Overview
 
-- **Purpose**: Curates and summarizes top global news from the last 24 hours.
-- **Beat Categorization**: Auto-tags stories into **Technology**, **Business**, **Science**, and **World**.
-- **In-App Reader**: Slide-over drawer lets users read story details without page reloads.
-- **Architecture**: Single Next.js full-stack monolith (React frontend + Node.js API proxy).
+Last247 renders a briefing of the most important stories from the last 24 hours.
+
+The application is **database-first**. News is collected continuously by a **separate ingestion service** and stored in a **Turso (libSQL) database**. This repository only ever *reads* that stored news and presents it.
+
+- **Purpose**: Present stored news clearly — categories, timestamps, sources, and an in-app reader.
+- **Responsibility**: Request the normalized feed from the backend and render it.
+- **Out of scope**: Collecting news, choosing news sources, and processing external APIs.
+
+### What the frontend does
+
+- Renders the lead story, the story list, categories, relative timestamps, and read times.
+- Opens the story reader drawer.
+- Handles loading, unavailable, empty, and malformed-record states.
+- Switches between light and dark themes.
+
+### What the frontend never does
+
+- No news-provider API keys, and no provider selection.
+- No calls to NewsAPI, GNews, NewsData.io, or any other external news API.
+- No triggering of the ingestion service.
+- No fallback to an external API when the database is empty.
+
+If the database has nothing to show, the UI says so. It never goes looking for news itself.
 
 ---
 
-## Key Features
+## Tech Stack
 
-- **24h Rolling Feed**: Top 20 headlines via NewsAPI.
-- **Keyword Classifier**: Auto-categorizes stories using headline and summary keywords.
-- **Slide-Over Drawer**: Modal reader for full summary, body snippet, and source links.
-- **Beat Accent Colors**: Blue (Tech), Amber (Business), Green (Science), Red (World).
-- **Dark Mode**: Persistent theme toggle via `localStorage` and system preference.
-- **Server Caching**: 15-minute (`900s`) Next.js cache to protect API quotas.
+| Layer | Technology | Notes |
+| :--- | :--- | :--- |
+| Framework | **Next.js 16.3** (App Router) | Serves the UI and the `/api/news` route handler. Turbopack is the default builder. |
+| UI library | **React 19.2** | Client components in `app/components/`. |
+| Language | **TypeScript 5** | `strict` mode, configured in `tsconfig.json`. |
+| Styling | **Tailwind CSS v4** | CSS-first configuration in `app/globals.css` (no `tailwind.config.js`). |
+| Icons | **lucide-react** | Inline SVG icon set. |
+| Fonts | `next/font/google` → Plus Jakarta Sans | Loaded in `app/layout.tsx`. |
+| Database client | **@libsql/client 0.18** | Reads the Turso database. Used only server-side, in `app/api/news/db.ts`. |
+| Linting | **ESLint 9** + `eslint-config-next` | `npm run lint`. |
+| Package manager | **npm** | `package-lock.json` is the committed lockfile. |
+| Testing | — | No test runner is configured. |
+| Docker / CI / Cloud | — | **Not part of this project.** |
 
 ---
 
-## Architecture & System Flow
+## Local Development
+
+### Prerequisites
+
+- **Node.js 20.9+** (Next.js 16 requires 20.9 or newer; this project is developed on Node 22).
+- **npm 10+**.
+
+### Steps
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Configure the database connection
+cp .env.example .env.local
+# then edit .env.local:
+#   TURSO_DATABASE_URL=libsql://your-database.turso.io
+#   TURSO_AUTH_TOKEN=your-token        # remote databases only
+#
+# For offline UI work you can point at a local file instead:
+#   TURSO_DATABASE_URL=file:./news.db
+
+# 3. Start the dev server
+npm run dev
+```
+
+Open **http://localhost:3000**.
+
+### Scripts
+
+| Command | What it does |
+| :--- | :--- |
+| `npm run dev` | Starts the dev server on http://localhost:3000 with hot reload. |
+| `npm run build` | Creates an optimized production build in `.next/`. |
+| `npm run start` | Serves the production build locally on http://localhost:3000. |
+| `npm run lint` | Runs ESLint. |
+
+### Environment variables
+
+| Variable | Required | Purpose |
+| :--- | :--- | :--- |
+| `TURSO_DATABASE_URL` | Yes | Turso connection string, or `file:./news.db` for local work. |
+| `TURSO_AUTH_TOKEN` | Remote only | Turso auth token. Leave empty for a local file. |
+
+These are the **only** environment variables this project reads. `.env.local` is git-ignored, and `.env.example` documents the shape.
+
+---
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    Client["Browser Client\n(React 19)"]
-    API["API Route Handler\n(/api/news)"]
-    Cache["Next.js Cache\n(900s ISR)"]
-    NewsAPI["NewsAPI.org\n(External API)"]
+    User["User opens Last247"]
+    UI["Frontend<br/>(React 19 client components)"]
+    API["GET /api/news<br/>(Next.js route handler)"]
+    DB[("Turso / libSQL<br/>articles table")]
+    Ingest["Ingestion service<br/>(separate Go repository)"]
 
-    Client -->|1. GET /api/news| API
-    API -->|2. Check cache| Cache
-    Cache -->|3. On miss / expired| NewsAPI
-    NewsAPI -->|4. Raw articles| API
-    API -->|5. Clean JSON| Client
+    User --> UI
+    UI -->|1. request the feed| API
+    API -->|2. read latest articles| DB
+    DB -->|3. stored articles| API
+    API -->|4. normalized JSON| UI
+    UI -->|5. render the briefing| User
+    Ingest -.->|writes articles| DB
 ```
 
----
+**The ingestion service is not part of this repository.** It is a separate Go service that collects news on a schedule and writes rows into the database. Last247 only ever reads.
 
-## System Usage Representation
+### Request flow
 
-### Frontend Usage (User Actions)
-
-| Step | User Action | Components | What Happens |
-| :--- | :--- | :--- | :--- |
-| **1. Page Load** | Opens `http://localhost:3000` | `Navbar`, `Hero`, `TopStories` | Reads theme from `localStorage`. Client calls `/api/news`. |
-| **2. Feed Display** | Browses news list | `FeaturedStory`, `StoryCard` | Lead story shown on left; 19 stories listed on right. |
-| **3. Open Story** | Clicks any story card | `NewsReaderAside` | Dispatches `last247:open-story`. Drawer slides in; page scroll locks. |
-| **4. Close Story** | Presses `Esc` or clicks backdrop | `NewsReaderAside` | Drawer closes; page scroll unlocks. |
-| **5. Switch Theme** | Clicks sun/moon icon | `Navbar` | Toggles `.dark` class on root HTML; updates `localStorage`. |
-
-### Backend Usage (API Flow)
-
-```
-[Client] ──> GET /api/news
-                │
-                ├── Validates process.env.NEWS_API_KEY (returns 500 if missing)
-                ├── Checks Next.js Data Cache (revalidate: 900)
-                │     ├── Cache HIT  ──> Returns cached JSON immediately
-                │     └── Cache MISS ──> Fetches https://newsapi.org/v2/top-headlines
-                │
-                └── Returns articles JSON to client (or 500 on network error)
+```text
+User opens Last247
+        ↓
+Frontend requests /api/news
+        ↓
+Backend reads Turso
+        ↓
+Frontend receives stored news
+        ↓
+UI renders Last247 feed
 ```
 
----
+### The `articles` table
 
-## Team Usage Guides
+`GET /api/news` reads a single table. The ingestion service owns it; Last247 only selects from it.
 
-### For Frontend Developers
+```sql
+CREATE TABLE articles (
+  id           TEXT PRIMARY KEY,
+  source_id    TEXT,
+  source_name  TEXT NOT NULL,
+  title        TEXT NOT NULL,
+  description  TEXT,
+  content      TEXT,
+  url          TEXT NOT NULL,
+  url_to_image TEXT,
+  author       TEXT,
+  published_at TEXT NOT NULL,   -- ISO 8601
+  ingested_at  TEXT             -- ISO 8601, used as a fallback timestamp
+);
 
-- **Source Code**: `app/components/` and `app/page.tsx`.
-- **Start Dev Server**: `npm run dev` (runs on `http://localhost:3000`).
-- **Fetch News Data**: Call internal endpoint:
-  ```ts
-  const res = await fetch("/api/news");
-  const data = await res.json(); // { status: "ok", articles: [...] }
-  ```
-- **Trigger Story Drawer**: Dispatch the custom window event from any card component:
-  ```ts
-  window.dispatchEvent(
-    new CustomEvent("last247:open-story", { detail: storyObject })
-  );
-  ```
-- **Theming & Colors**: Tailwind CSS v4 in `app/globals.css`. Use beat color classes:
-  - `bg-blue` / `text-blue` (Technology)
-  - `bg-amber` / `text-amber` (Business)
-  - `bg-green` / `text-green` (Science)
-  - `bg-red` / `text-red` (World)
-- **Offline / Mocking Tip**: If API quota is exhausted during UI work, mock the `articles` array directly in `app/components/TopStories.tsx`.
+CREATE INDEX idx_articles_published_at ON articles (published_at DESC);
+```
 
----
+The query is deliberately simple — the 20 most recent articles, newest first:
 
-### For Backend Developers
+```sql
+SELECT * FROM articles ORDER BY published_at DESC LIMIT 20;
+```
 
-- **Source Code**: `app/api/news/route.ts`.
-- **Environment Setup**: Add key to `.env.local`:
-  ```env
-  NEWS_API_KEY=your_news_api_key_here
-  ```
-- **Direct Endpoint Testing**:
-  ```bash
-  curl -i http://localhost:3000/api/news
-  ```
-- **Adjust Cache Lifespan**: Change cache duration in `app/api/news/route.ts`:
-  ```ts
-  // Change revalidate seconds (default: 900 = 15 mins)
-  const response = await fetch(url.toString(), {
-    next: { revalidate: 900 },
-  });
-  ```
-- **Upstream Query Options**: NewsAPI query parameters configured in route:
-  - `language`: `"en"`
-  - `pageSize`: `"20"`
-  - Upstream URL: `https://newsapi.org/v2/top-headlines`
-- **Extending the API**: To add custom summarization, filter logic, or LLM enhancements, perform data transformations inside `app/api/news/route.ts` before returning `NextResponse.json(...)`.
+If your database uses different column names, adjust `SELECT_LATEST` in `app/api/news/db.ts` and the field reads in `app/api/news/normalize.ts`. Nothing else needs to change.
 
 ---
 
@@ -125,160 +171,167 @@ flowchart LR
 
 ### `GET /api/news`
 
-Internal proxy route that queries NewsAPI.org and shields the secret key.
+The only endpoint the frontend calls. A read-only projection of the database.
 
 - **Method**: `GET`
-- **Auth**: None (server handles API key)
-- **Cache**: 15 minutes (`revalidate: 900`)
+- **Auth**: none from the browser — database credentials stay server-side.
+- **Caching**: `Cache-Control: public, s-maxage=60, stale-while-revalidate=300`.
+- **Rendering**: always executed at request time (`dynamic = "force-dynamic"`), so the feed is never baked into a build.
 
 #### Response (`200 OK`)
+
 ```json
 {
   "status": "ok",
   "totalResults": 20,
   "articles": [
     {
-      "source": { "id": "wired", "name": "Wired" },
+      "source": { "id": "reuters", "name": "Reuters" },
       "title": "Article title headline",
       "description": "Short article summary",
       "url": "https://example.com/story",
       "urlToImage": "https://example.com/image.jpg",
       "publishedAt": "2026-09-28T05:00:00Z",
-      "content": "Article body snippet..."
+      "content": "Article body snippet...",
+      "author": "Reuters Staff"
     }
-  ]
+  ],
+  "meta": {
+    "counts": { "returned": 20, "skipped": 0 }
+  }
 }
 ```
 
-#### Error Responses (`500`)
-- `{"error": "NEWS_API_KEY is not configured"}` — Missing key.
-- `{"error": "Unable to fetch news"}` — Upstream API error or rate limit.
+Every article has the same shape regardless of where the story was collected, so the UI never needs to know how it got there. `meta.counts.skipped` reports stored rows that could not be rendered.
+
+#### Error responses
+
+| Status | Body | Meaning |
+| :--- | :--- | :--- |
+| `503` | `{"error": "news_unavailable"}` | The database could not be read. |
+| `500` | `{"error": "news_not_configured"}` | `TURSO_DATABASE_URL` is not set. |
+
+Both are deliberately opaque. The details are logged server-side and never shown to the user.
+
+### UI states
+
+`app/components/TopStories.tsx` maps the response to one of five states:
+
+| State | Trigger | What the user sees |
+| :--- | :--- | :--- |
+| `loading` | Request in flight | Skeleton placeholders. |
+| `ready` | `200` with at least one article | The briefing. A muted "N records skipped" note appears if some rows were unreadable. |
+| `empty` | `200`, no articles, nothing skipped | "No stories have been collected yet" — the feed is waiting for the next collection cycle. |
+| `invalid` | `200`, no articles, at least one skipped | "No stories could be displayed" — the stored records are incomplete. |
+| `unavailable` | `503`, `500`, or a network error | "The news feed is temporarily unavailable", with a **Try again** button. |
+
+An empty database **never** triggers a request to any external news API.
 
 ---
 
-## Data Transformation Pipeline
+## System Usage
 
-`TopStories.tsx` converts raw articles before rendering:
+### Frontend (user actions)
 
-1. **Filter**: Skips articles without titles or titled `"[Removed]"`.
-2. **Category**: Keyword substring matching for `Technology`, `Business`, `Science`; defaults to `World`.
-3. **Accent**: Maps category to `blue`, `amber`, `green`, or `red`.
-4. **Read Time**: Word count / 200 WPM (`"X min read"`).
-5. **Time Ago**: Formats publication date to `"X min ago"` or `"Xh ago"`.
-6. **Clean Body**: Strips `[+123 chars]` truncation suffix from text.
+| Step | User action | Components | What happens |
+| :--- | :--- | :--- | :--- |
+| **1. Page load** | Opens `http://localhost:3000` | `Navbar`, `Hero`, `TopStories` | Theme is read from `localStorage`/system preference. `TopStories` requests `/api/news`. |
+| **2. Feed display** | Browses the news list | `FeaturedStory`, `StoryCard` | Lead story on the left, the rest in a scrollable column on the right. |
+| **3. Open story** | Clicks any story card | `NewsReaderAside` | Dispatches the `last247:open-story` window event; the drawer slides in and page scroll locks. |
+| **4. Close story** | Presses `Esc` or clicks the backdrop | `NewsReaderAside` | Drawer closes and page scroll unlocks. |
+| **5. Switch theme** | Clicks the sun/moon icon | `Navbar` | Toggles the `.dark` class on `<html>` and updates `localStorage`. |
+
+### Backend (`GET /api/news`)
+
+```
+[Client] ──> GET /api/news
+                │
+                ├── TURSO_DATABASE_URL set?          (no)  ──> 500 news_not_configured
+                │
+                ├── SELECT * FROM articles
+                │     ORDER BY published_at DESC
+                │     LIMIT 20
+                │        ├── query fails            ──> 503 news_unavailable
+                │        └── rows returned
+                │
+                ├── Normalize each row
+                │     ├── missing/placeholder title  ──> skipped
+                │     ├── missing url                ──> skipped
+                │     ├── no usable timestamp       ──> skipped
+                │     │     (published_at, else ingested_at)
+                │     └── otherwise                 ──> normalized article
+                │
+                └── 200 { status, totalResults, articles, meta.counts }
+```
+
+### Article normalization
+
+`app/api/news/normalize.ts` turns a database row into the article shape the UI expects. An article needs three things to be renderable: a real title, a link, and a usable timestamp. Rows missing any of them are counted as `skipped` and left out of the feed — the UI is built around a rolling 24-hour window, so a story with no timestamp cannot be placed in it.
 
 ---
 
-## Environment Variables
+## Working on the Frontend
 
-Create `.env.local` in project root:
+- **Source**: `app/components/` and `app/page.tsx`.
+- **Open the drawer from any component**:
+  ```ts
+  window.dispatchEvent(
+    new CustomEvent("last247:open-story", { detail: storyObject })
+  );
+  ```
+- **Theming & colors**: Tailwind v4 tokens live in `app/globals.css`. Beat accents are `bg-blue` / `text-blue` (Technology), `bg-amber` / `text-amber` (Business), `bg-green` / `text-green` (Science), `bg-red` / `text-red` (World).
+- **Offline / mocking tip**: if you have no database available, mock the `articles` array directly in `app/components/TopStories.tsx` while working on layout.
 
-```env
-NEWS_API_KEY=your_news_api_key_here
-```
-
-Get a free key from [newsapi.org](https://newsapi.org).
-
----
-
-## Quickstart
-
-### Prerequisites
-- Node.js 20+
-- npm / pnpm / yarn
-
-### Run Locally
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Add API key
-echo "NEWS_API_KEY=your_key_here" > .env.local
-
-# 3. Start development server
-npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000).
-
-### Build for Production
-```bash
-npm run build
-npm run start
-```
-
----
-
-## Docker Setup
-
-### Multi-stage `Dockerfile`
-
-```dockerfile
-FROM node:20-alpine AS deps
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
-
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-ENV NODE_ENV=production
-RUN npm run build
-
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-ENV PORT=3000
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-EXPOSE 3000
-CMD ["node", "server.js"]
-```
-
-> **Note**: Add `output: "standalone"` to `next.config.ts` for standalone build.
+The transformations in `TopStories.tsx` — category keywords, accent mapping, relative timestamps, and read time — are presentation concerns and belong in the UI. Collecting and normalizing incoming data does not.
 
 ---
 
 ## Project Structure
 
 ```
+.
 ├── app/
-│   ├── api/news/route.ts      # Backend route proxy to NewsAPI
+│   ├── api/news/
+│   │   ├── route.ts         # GET /api/news — returns the normalized feed
+│   │   ├── db.ts            # Turso/libSQL client and the articles query
+│   │   ├── normalize.ts     # Row → article mapping, malformed-row filtering
+│   │   └── types.ts         # NewsArticle contract shared with the client
 │   ├── components/
-│   │   ├── FeaturedStory.tsx  # Breaking lead story card
-│   │   ├── Footer.tsx         # Site footer & back-to-top link
-│   │   ├── Hero.tsx           # Page headline & stats
-│   │   ├── Meet.tsx           # Creator info & channel links
-│   │   ├── Navbar.tsx         # Navigation & theme toggle
-│   │   ├── NewsReaderAside.tsx# Slide-over story reader drawer
-│   │   ├── StoryCard.tsx      # News feed card item
-│   │   └── TopStories.tsx     # Client orchestrator: fetch & filter
-│   ├── globals.css            # Tailwind v4 styles & theme tokens
-│   ├── layout.tsx             # Root layout & Google fonts
-│   └── page.tsx               # Main page composition
-├── public/                    # Static SVG assets
-├── .env.local                 # Secret keys (not in git)
-├── next.config.ts             # Next.js configuration
-├── package.json               # Dependencies & scripts
-└── tsconfig.json              # TypeScript config
+│   │   ├── FeaturedStory.tsx   # Lead story card
+│   │   ├── Footer.tsx          # Site footer & back-to-top link
+│   │   ├── Hero.tsx            # Page headline & stats
+│   │   ├── Navbar.tsx          # Navigation & theme toggle
+│   │   ├── NewsReaderAside.tsx # Slide-over story reader drawer
+│   │   ├── StoryCard.tsx       # News feed card item
+│   │   └── TopStories.tsx      # Client orchestrator: fetch, convert, states
+│   ├── globals.css         # Tailwind v4 styles & theme tokens
+│   ├── layout.tsx          # Root layout & Google fonts
+│   └── page.tsx            # Main page composition
+├── public/                 # Static assets (served at the site root)
+├── .env.example            # Environment variable template
+├── .env.local              # Your database credentials (git-ignored)
+├── next.config.ts          # Next.js configuration
+├── package.json            # Dependencies & scripts
+└── tsconfig.json           # TypeScript config
 ```
+
+> `AGENTS.md` and `CLAUDE.md` are generated automatically by `next dev`. They are git-ignored rather than committed.
 
 ---
 
 ## Troubleshooting
 
-| Problem | Cause | Fix |
+| Problem | Likely cause | Fix |
 | :--- | :--- | :--- |
-| **500: Key not configured** | Missing `.env.local` | Add `NEWS_API_KEY=...` to `.env.local` and restart dev server. |
-| **500: Unable to fetch news** | NewsAPI rate limit hit (100 req/day on free plan) | Wait for quota reset or verify key on NewsAPI dashboard. |
-| **HTTP 426 on Production** | NewsAPI free plan only allows `localhost` | Upgrade NewsAPI plan or swap news provider in production. |
-| **"Meet" link in nav fails** | ID mismatch (`id="contact"` vs `#meet`) | Change `<section id="contact">` in `Meet.tsx` to `id="meet"`. |
+| **500 `news_not_configured`** | `TURSO_DATABASE_URL` is not set | Add it to `.env.local` and restart the dev server. |
+| **503 `news_unavailable`** | The database could not be read — bad URL, missing token, or the `articles` table does not exist | Check the server log for the underlying error, then verify the connection string and schema. |
+| **"No stories have been collected yet"** | The `articles` table is empty | Expected. The ingestion service populates it on its own schedule; Last247 will not fetch news to fill the gap. |
+| **"No stories could be displayed"** | Every stored row is missing a title, link, or timestamp | Inspect the rows and fix the ingestion service writing them. |
+| **"N records skipped" note under the feed** | Some recent rows are incomplete | The rest of the feed is still valid. Check `meta.counts.skipped` via the endpoint below. |
+| **Env change not picked up** | Next.js only reads env at startup | Stop and restart the dev server after editing `.env.local`. |
 
----
+Inspect the live feed with:
 
-## Architecture Evaluation: Node.js vs Python
-
-- **Current Architecture**: 100% TypeScript / Node.js monolith.
-- **Keep in Node.js**: Entire app. Next.js handles route proxying, ISR caching, and React rendering with zero inter-service network hops.
-- **Python Recommendation**: **Do not add Python** unless running offline ML models (PyTorch / Hugging Face embeddings) or custom scrapers (Scrapy). For API proxying and LLM streaming, Node.js/TypeScript is faster, lighter, and easier to maintain.
+```bash
+curl -s http://localhost:3000/api/news
+```

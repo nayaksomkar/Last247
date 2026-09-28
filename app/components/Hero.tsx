@@ -107,9 +107,9 @@ export default function Hero() {
               accentColor="group-hover:text-amber"
             />
             <StatCard
-              value="AI"
-              label="Distillation engine"
-              detail="Neutral point of view"
+              value="24/7"
+              label="Always collecting"
+              detail="Continuously updated feed"
               accentColor="group-hover:text-purple"
             />
           </div>

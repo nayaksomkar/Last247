@@ -55,7 +55,6 @@ export default function Navbar() {
             { name: "Home", href: "#home" },
             { name: "Latest", href: "#latest" },
             { name: "Stories", href: "#latest" },
-            { name: "Meet", href: "#meet" },
           ].map((item) => (
             <a
               key={item.name}

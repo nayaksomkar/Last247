@@ -117,8 +117,8 @@ export default function NewsReaderAside({ story, onClose }: Props) {
 
             <div className="mt-8 space-y-5 text-sm leading-7 text-muted">
               {(story.body ?? [
-                "This story is part of the latest 24-hour briefing. The full article summary will be generated from the strongest available reporting and presented here without sending you to another page.",
-                "As additional reporting emerges, the briefing can be updated to reflect what changed, why it matters, and what to watch next.",
+                "This story is part of the latest 24-hour briefing. Only a short summary was supplied by the source, so open the original article for the full report.",
+                "The briefing refreshes as new stories are collected, so this entry may be replaced by newer reporting.",
               ]).map((paragraph, index) => (
                 <p key={index}>{paragraph}</p>
               ))}
