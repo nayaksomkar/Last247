@@ -5,7 +5,7 @@ import { ApiError, fetchArticleById, fetchArticles } from "./api";
 import type { Article } from "./types";
 
 /** Feed page size. The API accepts up to 100 (UI_API_INTEGRATION.md §3). */
-export const PAGE_SIZE = 20;
+export const PAGE_SIZE = 5;
 
 export function toApiError(error: unknown): ApiError {
   return error instanceof ApiError
@@ -32,12 +32,24 @@ export function useNewsFeed() {
   const [loadMoreError, setLoadMoreError] = useState<ApiError | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  const [category, setCategory] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const nextOffset = useRef(0);
 
   // Reset to the loading state and refetch page 1. Called from user actions
   // (retry) — never in an effect body.
   const refresh = useCallback(() => {
+    setStatus("loading");
+    setError(null);
+    setLoadMoreError(null);
+    setReloadKey((k) => k + 1);
+  }, []);
+
+  const changeCategory = useCallback((newCategory: string | null) => {
+    setCategory(newCategory);
+    setArticles([]);
+    setTotal(0);
+    setHasMore(false);
     setStatus("loading");
     setError(null);
     setLoadMoreError(null);
@@ -52,7 +64,11 @@ export function useNewsFeed() {
       try {
         // The feed depends ONLY on GET /api/news — never gated on /health
         // (which can fail independently of the article API).
-        const page = await fetchArticles({ limit: PAGE_SIZE, offset: 0 });
+        const page = await fetchArticles({
+          limit: PAGE_SIZE,
+          offset: 0,
+          category: category || undefined,
+        });
 
         if (cancelled) return;
 
@@ -72,7 +88,7 @@ export function useNewsFeed() {
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [reloadKey, category]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
@@ -84,6 +100,7 @@ export function useNewsFeed() {
       const page = await fetchArticles({
         limit: PAGE_SIZE,
         offset: nextOffset.current,
+        category: category || undefined,
       });
 
       setArticles((prev) => {
@@ -101,7 +118,7 @@ export function useNewsFeed() {
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, hasMore]);
+  }, [loadingMore, hasMore, category]);
 
   return {
     articles,
@@ -113,6 +130,8 @@ export function useNewsFeed() {
     loadMore,
     loadMoreError,
     refresh,
+    category,
+    setCategory: changeCategory,
   };
 }
 

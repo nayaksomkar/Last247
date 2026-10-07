@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ChevronDown, RefreshCw } from "lucide-react";
 import { useNewsFeed } from "@/lib/hooks";
 import StoryCard from "./StoryCard";
@@ -12,6 +12,15 @@ export default function Feed() {
 
   const isLoading = feed.status === "loading";
 
+  // Collect unique categories from currently loaded articles
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    feed.articles.forEach((article) => {
+      if (article.category) cats.add(article.category);
+    });
+    return Array.from(cats).sort();
+  }, [feed.articles]);
+
   return (
     <>
       <section className="mx-auto w-full max-w-2xl px-3 sm:px-4">
@@ -22,6 +31,37 @@ export default function Feed() {
             THE FEED
           </h2>
           <div className="h-px flex-1 bg-ink/15" />
+        </div>
+
+        {/* Category filter */}
+        <div className="mb-5 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
+          <div className="flex gap-2 min-w-max">
+            <button
+              type="button"
+              onClick={() => feed.setCategory(null)}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                feed.category === null
+                  ? "bg-ink text-paper border-ink"
+                  : "bg-frost text-muted border-ink/10 hover:bg-ink/5"
+              }`}
+            >
+              All
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => feed.setCategory(cat)}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                  feed.category === cat
+                    ? "bg-ink text-paper border-ink"
+                    : "bg-frost text-muted border-ink/10 hover:bg-ink/5"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Loading */}
@@ -51,7 +91,7 @@ export default function Feed() {
 
             <p className="mx-auto mt-3 max-w-sm text-sm text-muted" role="alert">
               {feed.error?.message ??
-                "We couldn’t reach the news store. Please try again in a moment."}
+                "We couldn't reach the news store. Please try again in a moment."}
             </p>
 
             <button
@@ -128,7 +168,7 @@ export default function Feed() {
                 </button>
               ) : (
                 <p className="text-center font-display text-[10px] uppercase tracking-widest text-muted">
-                  That’s the whole wire
+                  That&apos;s the whole wire
                 </p>
               )}
             </div>

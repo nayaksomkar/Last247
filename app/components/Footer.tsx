@@ -17,10 +17,6 @@ export default function Footer() {
   return (
     <footer className="mx-auto w-full max-w-2xl px-3 pb-10 sm:px-4">
       <div className="rounded-3xl border border-ink/10 bg-frost p-5 soft-shadow backdrop-blur-xl sm:p-7">
-        <p className="font-display text-sm font-bold tracking-wider">
-          OPEN SOURCE, OBVIOUSLY
-        </p>
-
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {REPOS.map((repo) => (
             <a
