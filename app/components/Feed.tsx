@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ChevronDown, RefreshCw, X } from "lucide-react";
+import { Plus, RefreshCw, X, Check, ChevronDown } from "lucide-react";
 import { useNewsFeed } from "@/lib/hooks";
 import StoryCard from "./StoryCard";
 import ArticleReader from "./ArticleReader";
@@ -111,7 +111,7 @@ export default function Feed() {
                 className="shrink-0 rounded-full border bg-frost px-3 py-1.5 text-sm font-medium text-muted border-ink/10 hover:bg-ink/5 transition flex items-center gap-1"
               >
                 More
-                <ChevronDown size={12} />
+                <Plus size={12} />
               </button>
             )}
           </div>
@@ -256,13 +256,13 @@ export default function Feed() {
           aria-modal="true"
           aria-labelledby="categories-heading"
         >
-          {/* Dimmed backdrop */}
+          {/* Dark backdrop — dims the page without washing it out */}
           <div
-            className="absolute inset-0 bg-ink/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setModalOpen(false)}
             aria-hidden="true"
           />
-          {/* Modal content */}
+          {/* Modal content — dark frosted surface */}
           <div
             ref={modalContentRef}
             className="relative w-[75vw] max-w-[600px] h-[75vh] max-h-[500px] rounded-3xl border border-ink/10 bg-frost/95 backdrop-blur-xl soft-shadow-lg flex flex-col overflow-hidden"
@@ -284,29 +284,27 @@ export default function Feed() {
 
             {/* Category grid */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-              {/* All category */}
-              <button
-                type="button"
-                role="option"
-                aria-selected={isCategorySelected(null)}
-                onClick={() => handleCategorySelect(null)}
-                className={`w-full rounded-2xl px-4 py-3 text-left font-medium transition ${
-                  isCategorySelected(null)
-                    ? "bg-ink/10 text-ink"
-                    : "text-muted hover:bg-ink/5"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span>All</span>
-                  {isCategorySelected(null) && <X size={16} className="text-ink/60 shrink-0" />}
-                </div>
-              </button>
-
-              {/* Divider */}
-              <div className="my-4 border-t border-ink/10" />
-
-              {/* Category grid - 2 columns on larger screens, 1 on mobile */}
+              {/* Unified grid: All + categories in responsive 2-col layout */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* All category */}
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={isCategorySelected(null)}
+                  onClick={() => handleCategorySelect(null)}
+                  className={`rounded-2xl px-4 py-3 text-left font-medium transition ${
+                    isCategorySelected(null)
+                      ? "bg-lavender/20 text-ink border border-lavender/40"
+                      : "bg-frost/50 text-muted hover:bg-ink/5 border border-ink/10"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>All</span>
+                    {isCategorySelected(null) && <Check size={16} className="text-lavender shrink-0" />}
+                  </div>
+                </button>
+
+                {/* Categories from backend */}
                 {feed.categories.map((cat) => (
                   <button
                     key={cat}
@@ -316,13 +314,13 @@ export default function Feed() {
                     onClick={() => handleCategorySelect(cat)}
                     className={`rounded-2xl px-4 py-3 text-left font-medium transition ${
                       isCategorySelected(cat)
-                        ? "bg-ink/10 text-ink"
+                        ? "bg-lavender/20 text-ink border border-lavender/40"
                         : "bg-frost/50 text-muted hover:bg-ink/5 border border-ink/10"
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span>{cat}</span>
-                      {isCategorySelected(cat) && <X size={16} className="text-ink/60 shrink-0" />}
+                      {isCategorySelected(cat) && <Check size={16} className="text-lavender shrink-0" />}
                     </div>
                   </button>
                 ))}
