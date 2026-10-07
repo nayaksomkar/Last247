@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { ChevronDown, RefreshCw } from "lucide-react";
 import { useNewsFeed } from "@/lib/hooks";
 import StoryCard from "./StoryCard";
@@ -11,15 +11,6 @@ export default function Feed() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const isLoading = feed.status === "loading";
-
-  // Collect unique categories from currently loaded articles
-  const categories = useMemo(() => {
-    const cats = new Set<string>();
-    feed.articles.forEach((article) => {
-      if (article.category) cats.add(article.category);
-    });
-    return Array.from(cats).sort();
-  }, [feed.articles]);
 
   return (
     <>
@@ -34,35 +25,48 @@ export default function Feed() {
         </div>
 
         {/* Category filter */}
-        <div className="mb-5 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
-          <div className="flex gap-2 min-w-max">
-            <button
-              type="button"
-              onClick={() => feed.setCategory(null)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                feed.category === null
-                  ? "bg-ink text-paper border-ink"
-                  : "bg-frost text-muted border-ink/10 hover:bg-ink/5"
-              }`}
-            >
-              All
-            </button>
-            {categories.map((cat) => (
+        {feed.categories.length > 0 && (
+          <div className="mb-5 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
+            <div className="flex gap-2 min-w-max">
               <button
-                key={cat}
                 type="button"
-                onClick={() => feed.setCategory(cat)}
+                onClick={() => feed.setCategory(null)}
                 className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                  feed.category === cat
+                  feed.category === null
                     ? "bg-ink text-paper border-ink"
                     : "bg-frost text-muted border-ink/10 hover:bg-ink/5"
                 }`}
               >
-                {cat}
+                All
               </button>
-            ))}
+              {feed.categories.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => feed.setCategory(cat)}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                    feed.category === cat
+                      ? "bg-ink text-paper border-ink"
+                      : "bg-frost text-muted border-ink/10 hover:bg-ink/5"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Categories loading indicator */}
+        {feed.categoriesLoading && feed.categories.length === 0 && (
+          <div className="mb-5 flex gap-2 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
+            <div className="flex gap-2 min-w-max">
+              <div className="shrink-0 rounded-full border bg-frost px-3 py-1.5 animate-pulse" />
+              <div className="shrink-0 rounded-full border bg-frost px-6 py-1.5 animate-pulse" />
+              <div className="shrink-0 rounded-full border bg-frost px-6 py-1.5 animate-pulse" />
+            </div>
+          </div>
+        )}
 
         {/* Loading */}
         {isLoading && (

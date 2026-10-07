@@ -23,6 +23,44 @@ export function cleanContent(text: string): string {
   return text.replace(/\[\+\d+\s*chars\]/gi, "").trim();
 }
 
+/**
+ * Removes duplicated opening from article content when it matches the summary.
+ * Returns the content with the duplicated prefix removed, or empty string if
+ * nothing meaningful remains.
+ */
+export function deduplicateContent(content: string, summary: string): string {
+  if (!content || !summary) return content;
+
+  const cleanContent = content.trim();
+  const cleanSummary = summary.trim();
+
+  if (!cleanContent || !cleanSummary) return cleanContent;
+
+  // Normalize whitespace for comparison
+  const normContent = cleanContent.replace(/\s+/g, " ");
+  const normSummary = cleanSummary.replace(/\s+/g, " ");
+
+  // Check if content starts with summary (allowing for minor differences)
+  if (normContent.startsWith(normSummary)) {
+    const remaining = cleanContent.slice(cleanSummary.length).trim();
+    // Only return remaining if it has meaningful content (> 50 chars)
+    return remaining.length > 50 ? remaining : "";
+  }
+
+  // Check for substantial overlap: summary is contained at start of content
+  // with up to 20% extra characters (handles added lead-in phrases)
+  const maxOverlapLen = Math.floor(cleanSummary.length * 1.2);
+  const contentPrefix = cleanContent.slice(0, maxOverlapLen);
+
+  if (contentPrefix.includes(cleanSummary)) {
+    const summaryIndex = contentPrefix.indexOf(cleanSummary);
+    const remaining = cleanContent.slice(summaryIndex + cleanSummary.length).trim();
+    return remaining.length > 50 ? remaining : "";
+  }
+
+  return cleanContent;
+}
+
 /** Rough reading time from actual text; "" when there is nothing to read. */
 export function readMinutes(text: string): string {
   const words = cleanContent(text)

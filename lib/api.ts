@@ -1,27 +1,14 @@
 import { API_BASE_URL } from "./config";
 import type {
   Article,
+  ArticlePage,
+  CategoriesResponse,
   HealthResponse,
   IngestionResult,
+  ListArticlesParams,
   NewsListResponse,
   StatsResponse,
 } from "./types";
-
-export type ListArticlesParams = {
-  /** Max articles per page. The backend accepts 1–100; outside → 422. */
-  limit?: number;
-  /** Articles to skip (pagination). Negative → 422. */
-  offset?: number;
-  /** Exact-match category filter. */
-  category?: string;
-  /** Exact-match publisher filter. */
-  source?: string;
-};
-
-export type ArticlePage = NewsListResponse & {
-  /** True when more pages are available (`offset + len < total`). */
-  hasMore: boolean;
-};
 
 /**
  * API-layer error. For HTTP error responses it carries the documented
@@ -136,3 +123,11 @@ export async function triggerIngest(): Promise<IngestionResult> {
 
   return data.result;
 }
+
+/** `GET /api/news/categories` — list of available categories. */
+export async function fetchCategories(): Promise<string[]> {
+  const data = await request<CategoriesResponse>("/api/news/categories");
+  return data.categories;
+}
+
+export type { ListArticlesParams, ArticlePage };

@@ -5,6 +5,7 @@ import { ArrowUpRight, RefreshCw, X } from "lucide-react";
 import {
   UNKNOWN,
   cleanContent,
+  deduplicateContent,
   formatUtc,
   readMinutes,
   timeAgo,
@@ -49,10 +50,11 @@ export default function ArticleReader({ articleId, onClose }: Props) {
   if (!articleId) return null;
 
   // Cleaned for display — never show internal processing markers.
-  const content = article ? cleanContent(article.content ?? "") : "";
+  const rawContent = article ? cleanContent(article.content ?? "") : "";
   const summary = article?.description
     ? cleanContent(article.description)
     : "";
+  const content = deduplicateContent(rawContent, summary);
   const readTime = article
     ? readMinutes(`${article.description ?? ""} ${article.content ?? ""}`)
     : "";

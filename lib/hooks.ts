@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, fetchArticleById, fetchArticles } from "./api";
+import { ApiError, fetchArticleById, fetchArticles, fetchCategories } from "./api";
 import type { Article } from "./types";
 
 /** Feed page size. The API accepts up to 100 (UI_API_INTEGRATION.md §3). */
@@ -33,8 +33,35 @@ export function useNewsFeed() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   const [category, setCategory] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
   const nextOffset = useRef(0);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cats = await fetchCategories();
+        if (!cancelled) {
+          setCategories(cats);
+        }
+      } catch {
+        // If categories fetch fails, feed still works with "All"
+        if (!cancelled) {
+          setCategories([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setCategoriesLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Reset to the loading state and refetch page 1. Called from user actions
   // (retry) — never in an effect body.
@@ -107,7 +134,7 @@ export function useNewsFeed() {
         // Offset pagination is stable, but dedupe by id anyway so a
         // concurrent refresh can't duplicate rows.
         const seen = new Set(prev.map((a) => a.id));
-        return [...prev, ...page.articles.filter((a) => !seen.has(a.id))];
+        return [...prev, ...page.articles.filter((a: Article) => !seen.has(a.id))];
       });
       setTotal(page.total);
       setHasMore(page.hasMore);
@@ -132,6 +159,8 @@ export function useNewsFeed() {
     refresh,
     category,
     setCategory: changeCategory,
+    categories,
+    categoriesLoading,
   };
 }
 

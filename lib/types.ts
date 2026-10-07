@@ -69,3 +69,26 @@ export interface ApiErrorBody {
   error: string;
   code: string;
 }
+
+/** Query parameters for `GET /api/news`. */
+export interface ListArticlesParams {
+  /** Max articles per page. The backend accepts 1–100; outside → 422. */
+  limit?: number;
+  /** Articles to skip (pagination). Negative → 422. */
+  offset?: number;
+  /** Exact-match category filter. */
+  category?: string;
+  /** Exact-match publisher filter. */
+  source?: string;
+}
+
+/** Response of `GET /api/news` with pagination metadata. */
+export interface ArticlePage extends NewsListResponse {
+  /** True when more pages are available (`offset + len < total`). */
+  hasMore: boolean;
+}
+
+/** Response of `GET /api/news/categories` — list of available categories. */
+export interface CategoriesResponse {
+  categories: string[];
+}
