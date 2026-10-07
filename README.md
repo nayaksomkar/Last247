@@ -63,7 +63,7 @@ Two options — the frontend works with either:
 
 ```bash
 # Option A — use the deployed backend (default, zero setup)
-# .env.local already points to https://orcadelast247.onrender.com — skip to step 2.
+# .env already points to https://orcadelast247.onrender.com — skip to step 2.
 
 # Option B — run the backend locally (in the sibling OrcaDeLast247 repo, using uv)
 cd ../OrcaDeLast247
@@ -72,14 +72,14 @@ cp .env.example .env          # then edit .env (TURSO_DATABASE_URL, provider key
 uv run python main.py         # API server on http://localhost:8080
 ```
 
-For Option B, set `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080` in `.env.local` (step 2).
+For Option B, set `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080` in `.env` (step 2).
 
 ### 2. Start the UI
 
 ```bash
 npm install                   # install dependencies
 
-cp .env.example .env.local    # skip editing if using the deployed backend (Option A)
+cp .env.example .env    # skip editing if using the deployed backend (Option A)
 
 npm run dev                   # dev server on http://localhost:3000
 ```
@@ -230,12 +230,12 @@ Error responses: `{"error": string, "code": string}` (`NOT_FOUND`, `INTERNAL_ERR
 
 | Problem | Likely cause | Fix |
 | :--- | :--- | :--- |
-| **"Feed unavailable" + network error** | The Python backend isn't running or `NEXT_PUBLIC_API_BASE_URL` is wrong | Start the backend (`uv run python main.py`, default port 8080) and verify the base URL in `.env.local`. |
+| **"Feed unavailable" + network error** | The Python backend isn't running or `NEXT_PUBLIC_API_BASE_URL` is wrong | Start the backend (`uv run python main.py`, default port 8080) and verify the base URL in `.env`. |
 | **"Live" pill shows "Offline"** | `/health` unreachable | The pill reflects `GET /health` only; check the backend service. |
 | **"No stories have been collected yet"** | Database is empty | Expected before/during ingestion; stories appear after the next run. |
 | **"Article not found"** | 404 `NOT_FOUND` from `GET /api/news/{id}` | The article was removed by the retention sweep or the ID is stale. |
 | **422 on feed fetch** | Invalid `limit`/`offset` (outside 1–100 / negative) | The backend rejects — not clamps — invalid pagination params. |
-| **Env change not picked up** | `NEXT_PUBLIC_*` vars are inlined at build/dev-server start | Restart the dev server after editing `.env.local`. |
+| **Env change not picked up** | `NEXT_PUBLIC_*` vars are inlined at build/dev-server start | Restart the dev server after editing `.env`. |
 
 Inspect the backend directly:
 
