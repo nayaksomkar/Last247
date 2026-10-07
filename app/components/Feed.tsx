@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, RefreshCw } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { ChevronDown, RefreshCw, X } from "lucide-react";
 import { useNewsFeed } from "@/lib/hooks";
 import StoryCard from "./StoryCard";
 import ArticleReader from "./ArticleReader";
@@ -9,8 +9,47 @@ import ArticleReader from "./ArticleReader";
 export default function Feed() {
   const feed = useNewsFeed();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
 
   const isLoading = feed.status === "loading";
+
+  // Determine visible categories: "All" + first 2 from the list
+  const visibleCategories = feed.categories.slice(0, 2);
+  const hasMoreCategories = feed.categories.length > 2;
+
+  // Close popover when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (moreRef.current && !moreRef.current.contains(event.target as Node)) {
+        setMoreOpen(false);
+      }
+    }
+    if (moreOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [moreOpen]);
+
+  // Close popover on Escape key
+  useEffect(() => {
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMoreOpen(false);
+      }
+    }
+    if (moreOpen) {
+      document.addEventListener("keydown", handleEscape);
+    }
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [moreOpen]);
+
+  const handleCategorySelect = (category: string | null) => {
+    feed.setCategory(category);
+    setMoreOpen(false);
+  };
+
+  const isCategorySelected = (cat: string | null) => feed.category === cat;
 
   return (
     <>
@@ -26,26 +65,26 @@ export default function Feed() {
 
         {/* Category filter */}
         {feed.categories.length > 0 && (
-          <div className="mb-5 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
-            <div className="flex gap-2 min-w-max">
+          <div className="mb-5 flex items-center gap-2">
+            <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => feed.setCategory(null)}
+                onClick={() => handleCategorySelect(null)}
                 className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                  feed.category === null
+                  isCategorySelected(null)
                     ? "bg-ink text-paper border-ink"
                     : "bg-frost text-muted border-ink/10 hover:bg-ink/5"
                 }`}
               >
                 All
               </button>
-              {feed.categories.map((cat) => (
+              {visibleCategories.map((cat) => (
                 <button
                   key={cat}
                   type="button"
-                  onClick={() => feed.setCategory(cat)}
+                  onClick={() => handleCategorySelect(cat)}
                   className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                    feed.category === cat
+                    isCategorySelected(cat)
                       ? "bg-ink text-paper border-ink"
                       : "bg-frost text-muted border-ink/10 hover:bg-ink/5"
                   }`}
@@ -54,6 +93,70 @@ export default function Feed() {
                 </button>
               ))}
             </div>
+            {hasMoreCategories && (
+              <div className="relative ml-1" ref={moreRef}>
+                <button
+                  type="button"
+                  onClick={() => setMoreOpen(!moreOpen)}
+                  className="shrink-0 rounded-full border bg-frost px-3 py-1.5 text-sm font-medium text-muted border-ink/10 hover:bg-ink/5 transition flex items-center gap-1"
+                  aria-expanded={moreOpen}
+                  aria-haspopup="listbox"
+                >
+                  More
+                  <ChevronDown size={12} className={moreOpen ? "rotate-180" : ""} />
+                </button>
+                {moreOpen && (
+                  <div
+                    className="absolute right-0 top-full mt-2 z-50 w-48 sm:w-56 origin-top-right animate-popIn"
+                    role="listbox"
+                    aria-label="All categories"
+                  >
+                    <div className="rounded-2xl border border-ink/10 bg-frost/95 backdrop-blur-xl p-2 soft-shadow-lg">
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={isCategorySelected(null)}
+                        onClick={() => handleCategorySelect(null)}
+                        className={`w-full text-left rounded-xl px-3 py-2 text-sm font-medium transition ${
+                          isCategorySelected(null)
+                            ? "bg-ink/10 text-ink"
+                            : "text-muted hover:bg-ink/5"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span>All</span>
+                          {isCategorySelected(null) && (
+                            <X size={14} className="text-ink/60 shrink-0" />
+                          )}
+                        </div>
+                      </button>
+                      <div className="mt-1 pt-1 border-t border-ink/10" />
+                      {feed.categories.map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          role="option"
+                          aria-selected={isCategorySelected(cat)}
+                          onClick={() => handleCategorySelect(cat)}
+                          className={`w-full text-left rounded-xl px-3 py-2 text-sm font-medium transition ${
+                            isCategorySelected(cat)
+                              ? "bg-ink/10 text-ink"
+                              : "text-muted hover:bg-ink/5"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>{cat}</span>
+                            {isCategorySelected(cat) && (
+                              <X size={14} className="text-ink/60 shrink-0" />
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
