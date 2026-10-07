@@ -1,14 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ApiError,
-  fetchArticleById,
-  fetchArticles,
-  fetchHealth,
-  fetchStats,
-} from "./api";
-import type { Article, StatsResponse } from "./types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ApiError, fetchArticleById, fetchArticles } from "./api";
+import type { Article } from "./types";
 
 /** Feed page size. The API accepts up to 100 (UI_API_INTEGRATION.md §3). */
 export const PAGE_SIZE = 20;
@@ -19,30 +13,15 @@ export function toApiError(error: unknown): ApiError {
     : new ApiError("Something went wrong. Please try again.", 0, "UNKNOWN");
 }
 
-function distinct(articles: Article[], field: "category" | "source") {
-  return [
-    ...new Set(
-      articles.map((a) => a[field]).filter((v): v is string => Boolean(v)),
-    ),
-  ].sort();
-}
-
 // ---------------------------------------------------------------------------
 // News feed (GET /api/news)
 // ---------------------------------------------------------------------------
 
 export type FeedStatus = "loading" | "ready" | "empty" | "unavailable";
 
-export type FilterOptions = {
-  categories: string[];
-  sources: string[];
-};
-
 /**
- * Feed state: paginated articles plus exact-match category/source filters.
- *
- * The backend sorts fixed (published_at DESC, id ASC) and has no text search,
- * so there is deliberately no sorting or search control here.
+ * Feed state: paginated articles, newest first (fixed backend ordering —
+ * deliberately no sorting or search control here).
  */
 export function useNewsFeed() {
   const [articles, setArticles] = useState<Article[]>([]);
@@ -52,29 +31,17 @@ export function useNewsFeed() {
   const [error, setError] = useState<ApiError | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<ApiError | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [category, setCategory] = useState("");
-  const [source, setSource] = useState("");
 
   const [reloadKey, setReloadKey] = useState(0);
   const nextOffset = useRef(0);
 
   // Reset to the loading state and refetch page 1. Called from user actions
-  // (refresh) — never in an effect body.
-  const beginLoad = useCallback(() => {
+  // (retry) — never in an effect body.
+  const refresh = useCallback(() => {
     setStatus("loading");
     setError(null);
     setLoadMoreError(null);
     setReloadKey((k) => k + 1);
-  }, []);
-
-  const refresh = beginLoad;
-
-  // Filtering is client-side over the fetched articles (§19) — no API call.
-  const changeCategory = useCallback((value: string) => setCategory(value), []);
-  const changeSource = useCallback((value: string) => setSource(value), []);
-  const clearFilters = useCallback(() => {
-    setCategory("");
-    setSource("");
   }, []);
 
   useEffect(() => {
@@ -84,17 +51,10 @@ export function useNewsFeed() {
     (async () => {
       try {
         // The feed depends ONLY on GET /api/news — never gated on /health
-        // (which can fail independently of the article API). No filter
-        // params: filtering happens client-side over the fetched pages.
+        // (which can fail independently of the article API).
         const page = await fetchArticles({ limit: PAGE_SIZE, offset: 0 });
 
         if (cancelled) return;
-
-        if (process.env.NODE_ENV === "development") {
-          console.log(
-            `[Last247] /api/news -> ${page.total} total, ${page.articles.length} on page`,
-          );
-        }
 
         setArticles(page.articles);
         setTotal(page.total);
@@ -143,29 +103,8 @@ export function useNewsFeed() {
     }
   }, [loadingMore, hasMore]);
 
-  // Client-side filter over the fetched articles — no extra API requests.
-  const visible = useMemo(
-    () =>
-      articles.filter(
-        (a) =>
-          (!category || a.category === category) &&
-          (!source || a.source === source),
-      ),
-    [articles, category, source],
-  );
-
-  // Filter dropdown options derived from the fetched articles.
-  const filterOptions = useMemo<FilterOptions>(
-    () => ({
-      categories: distinct(articles, "category"),
-      sources: distinct(articles, "source"),
-    }),
-    [articles],
-  );
-
   return {
     articles,
-    visible,
     total,
     hasMore,
     status,
@@ -173,12 +112,6 @@ export function useNewsFeed() {
     loadingMore,
     loadMore,
     loadMoreError,
-    category,
-    source,
-    changeCategory,
-    changeSource,
-    clearFilters,
-    filterOptions,
     refresh,
   };
 }
@@ -232,90 +165,4 @@ export function useArticle(id: string | null) {
   }, [id, reloadKey]);
 
   return { article, status, error, retry };
-}
-
-// ---------------------------------------------------------------------------
-// Stats (GET /api/stats)
-// ---------------------------------------------------------------------------
-
-export type StatsStatus = "loading" | "ready" | "unavailable";
-
-export function useStats() {
-  const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [status, setStatus] = useState<StatsStatus>("loading");
-  const [error, setError] = useState<ApiError | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  const refresh = useCallback(() => {
-    setStatus("loading");
-    setError(null);
-    setReloadKey((k) => k + 1);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const data = await fetchStats();
-        if (!cancelled) {
-          setStats(data);
-          setStatus("ready");
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(toApiError(e));
-          setStatus("unavailable");
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadKey]);
-
-  return { stats, status, error, refresh };
-}
-
-// ---------------------------------------------------------------------------
-// Health (GET /health)
-// ---------------------------------------------------------------------------
-
-export type HealthStatus = "checking" | "up" | "down";
-
-export function useHealth() {
-  const [status, setStatus] = useState<HealthStatus>("checking");
-  const [reloadKey, setReloadKey] = useState(0);
-
-  const refresh = useCallback(() => {
-    setStatus("checking");
-    setReloadKey((k) => k + 1);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const data = await fetchHealth();
-        if (!cancelled) setStatus(data.status === "ok" ? "up" : "down");
-      } catch {
-        // /health can fail independently of the article API — probe the
-        // actual endpoint the app uses before showing "Offline".
-        try {
-          await fetchArticles({ limit: 1 });
-          if (!cancelled) setStatus("up");
-        } catch {
-          if (!cancelled) setStatus("down");
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadKey]);
-
-  return { status, refresh };
 }

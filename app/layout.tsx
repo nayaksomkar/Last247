@@ -1,17 +1,24 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Silkscreen, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
+const body = Space_Grotesk({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-plus-jakarta",
+  variable: "--font-body",
+});
+
+const display = Silkscreen({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  display: "swap",
+  variable: "--font-display",
 });
 
 export const metadata: Metadata = {
   title: "Last247 — What mattered in the last 24 hours",
   description:
-    "The most important stories from the last 24 hours, collected continuously and read in one place.",
+    "The most important stories from the last 24 hours, in one scrollable feed. Open, scroll, read, close.",
 };
 
 export default function RootLayout({
@@ -20,8 +27,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={plusJakartaSans.variable} suppressHydrationWarning>
-      <body className={plusJakartaSans.className}>{children}</body>
+    <html
+      lang="en"
+      className={`${body.variable} ${display.variable}`}
+      suppressHydrationWarning
+    >
+      <body className={body.className}>{children}</body>
     </html>
   );
 }

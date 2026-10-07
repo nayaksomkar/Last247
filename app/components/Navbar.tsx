@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useHealth } from "@/lib/hooks";
 
 export default function Navbar() {
   const [darkMode, setDarkMode] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const health = useHealth();
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
@@ -31,119 +29,48 @@ export default function Navbar() {
   };
 
   return (
-    <header className="fixed top-4 inset-x-0 z-50 flex justify-center px-4">
-      <div className="flex h-16 w-full max-w-4xl items-center justify-between rounded-full border border-border/70 bg-card/65 px-4 shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur-xl transition-all duration-300 dark:bg-card/50 dark:shadow-[0_8px_30px_rgb(0,0,0,0.25)] dark:border-border/50 sm:px-6">
-        
-        {/* Logo */}
+    <header className="sticky top-0 z-50 px-3 pt-3 sm:px-4">
+      <nav className="mx-auto flex h-12 w-full max-w-2xl items-center justify-between rounded-2xl border-2 border-ink bg-frost px-2.5 shadow-[3px_3px_0_0_var(--ink)] backdrop-blur-xl">
         <Link
           href="/"
-          className="group flex items-center gap-2.5"
+          className="flex items-center gap-2 px-1"
           aria-label="Last247 home"
         >
-          <div className="flex h-7 px-1.5 items-center justify-center rounded-lg bg-foreground text-xs font-bold text-background transition-transform duration-300 group-hover:scale-105 group-hover:-rotate-6">
-            24/7
-          </div>
-
-          <div className="leading-none">
-            <span className="block text-sm font-bold tracking-tight">
-              Last247
-            </span>
-          </div>
+          <span className="grid h-7 w-7 place-items-center rounded-lg border-2 border-ink bg-yellow font-display text-[11px] font-bold text-[#111]">
+            24
+          </span>
+          <span className="font-display text-sm font-bold tracking-wider">
+            LAST247
+          </span>
         </Link>
 
-        {/* Centered Segmented Navigation */}
-        <nav className="hidden items-center gap-1 md:flex">
-          {[
-            { name: "Home", href: "#home" },
-            { name: "Latest", href: "#latest" },
-            { name: "Stories", href: "#latest" },
-          ].map((item) => (
-            <a
-              key={item.name}
-              href={item.href}
-              className="rounded-full px-3.5 py-1.5 text-xs font-medium text-muted transition-all duration-200 hover:bg-foreground/5 hover:text-foreground active:scale-95"
-            >
-              {item.name}
-            </a>
-          ))}
-        </nav>
-
-        {/* Right side controls */}
-        <div className="flex items-center gap-2">
-
-          {/* Backend health (GET /health) */}
-          <div
-            className="hidden items-center gap-1.5 rounded-full border border-border/80 bg-background/50 px-2.5 py-1.5 sm:flex"
-            role="status"
-            aria-live="polite"
-            title="Backend /health status"
+        {mounted && (
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+            className="grid h-8 w-8 place-items-center rounded-lg border-2 border-ink bg-frost-soft transition hover:-translate-y-0.5 hover:shadow-[2px_2px_0_0_var(--ink)]"
           >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                health.status === "up"
-                  ? "bg-green"
-                  : health.status === "down"
-                    ? "bg-red"
-                    : "bg-muted"
-              }`}
-            />
-
-            <span className="text-[11px] font-medium text-muted">
-              {health.status === "up"
-                ? "Live"
-                : health.status === "down"
-                  ? "Offline"
-                  : "Checking"}
-            </span>
-          </div>
-
-          {/* Theme toggle */}
-          {mounted && (
-            <button
-              type="button"
-              onClick={toggleTheme}
-              aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-border/80 bg-background/50 text-muted transition-all duration-300 hover:border-foreground/40 hover:text-foreground active:scale-90"
-            >
-              {darkMode ? (
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="4" />
-                  <path d="M12 2v2" />
-                  <path d="M12 20v2" />
-                  <path d="m4.93 4.93 1.41 1.41" />
-                  <path d="m17.66 17.66 1.41 1.41" />
-                  <path d="M2 12h2" />
-                  <path d="M20 12h2" />
-                  <path d="m6.34 17.66-1.41 1.41" />
-                  <path d="m19.07 4.93-1.41 1.41" />
-                </svg>
-              ) : (
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-              )}
-            </button>
-          )}
-        </div>
-      </div>
+            {darkMode ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2" />
+                <path d="M12 20v2" />
+                <path d="m4.93 4.93 1.41 1.41" />
+                <path d="m17.66 17.66 1.41 1.41" />
+                <path d="M2 12h2" />
+                <path d="M20 12h2" />
+                <path d="m6.34 17.66-1.41 1.41" />
+                <path d="m19.07 4.93-1.41 1.41" />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            )}
+          </button>
+        )}
+      </nav>
     </header>
   );
 }
