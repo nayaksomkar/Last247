@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronDown, RefreshCw, X } from "lucide-react";
 import { useNewsFeed } from "@/lib/hooks";
 import StoryCard from "./StoryCard";
@@ -9,8 +9,9 @@ import ArticleReader from "./ArticleReader";
 export default function Feed() {
   const feed = useNewsFeed();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreRef = useRef<HTMLDivElement>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const modalContentRef = useRef<HTMLDivElement>(null);
 
   const isLoading = feed.status === "loading";
 
@@ -18,36 +19,46 @@ export default function Feed() {
   const visibleCategories = feed.categories.slice(0, 2);
   const hasMoreCategories = feed.categories.length > 2;
 
-  // Close popover when clicking outside
+  // Close modal when clicking outside (on overlay)
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (moreRef.current && !moreRef.current.contains(event.target as Node)) {
-        setMoreOpen(false);
+      if (modalRef.current && !modalContentRef.current?.contains(event.target as Node)) {
+        setModalOpen(false);
       }
     }
-    if (moreOpen) {
+    if (modalOpen) {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [moreOpen]);
+  }, [modalOpen]);
 
-  // Close popover on Escape key
+  // Close modal on Escape key
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setMoreOpen(false);
+        setModalOpen(false);
       }
     }
-    if (moreOpen) {
+    if (modalOpen) {
       document.addEventListener("keydown", handleEscape);
     }
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [moreOpen]);
+  }, [modalOpen]);
 
-  const handleCategorySelect = (category: string | null) => {
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (modalOpen) {
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [modalOpen]);
+
+  const handleCategorySelect = useCallback((category: string | null) => {
     feed.setCategory(category);
-    setMoreOpen(false);
-  };
+    setModalOpen(false);
+  }, [feed]);
 
   const isCategorySelected = (cat: string | null) => feed.category === cat;
 
@@ -94,68 +105,14 @@ export default function Feed() {
               ))}
             </div>
             {hasMoreCategories && (
-              <div className="relative ml-1" ref={moreRef}>
-                <button
-                  type="button"
-                  onClick={() => setMoreOpen(!moreOpen)}
-                  className="shrink-0 rounded-full border bg-frost px-3 py-1.5 text-sm font-medium text-muted border-ink/10 hover:bg-ink/5 transition flex items-center gap-1"
-                  aria-expanded={moreOpen}
-                  aria-haspopup="listbox"
-                >
-                  More
-                  <ChevronDown size={12} className={moreOpen ? "rotate-180" : ""} />
-                </button>
-                {moreOpen && (
-                  <div
-                    className="absolute right-0 top-full mt-2 z-50 w-48 sm:w-56 origin-top-right animate-popIn"
-                    role="listbox"
-                    aria-label="All categories"
-                  >
-                    <div className="rounded-2xl border border-ink/10 bg-frost/95 backdrop-blur-xl p-2 soft-shadow-lg">
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={isCategorySelected(null)}
-                        onClick={() => handleCategorySelect(null)}
-                        className={`w-full text-left rounded-xl px-3 py-2 text-sm font-medium transition ${
-                          isCategorySelected(null)
-                            ? "bg-ink/10 text-ink"
-                            : "text-muted hover:bg-ink/5"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span>All</span>
-                          {isCategorySelected(null) && (
-                            <X size={14} className="text-ink/60 shrink-0" />
-                          )}
-                        </div>
-                      </button>
-                      <div className="mt-1 pt-1 border-t border-ink/10" />
-                      {feed.categories.map((cat) => (
-                        <button
-                          key={cat}
-                          type="button"
-                          role="option"
-                          aria-selected={isCategorySelected(cat)}
-                          onClick={() => handleCategorySelect(cat)}
-                          className={`w-full text-left rounded-xl px-3 py-2 text-sm font-medium transition ${
-                            isCategorySelected(cat)
-                              ? "bg-ink/10 text-ink"
-                              : "text-muted hover:bg-ink/5"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span>{cat}</span>
-                            {isCategorySelected(cat) && (
-                              <X size={14} className="text-ink/60 shrink-0" />
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={() => setModalOpen(true)}
+                className="shrink-0 rounded-full border bg-frost px-3 py-1.5 text-sm font-medium text-muted border-ink/10 hover:bg-ink/5 transition flex items-center gap-1"
+              >
+                More
+                <ChevronDown size={12} />
+              </button>
             )}
           </div>
         )}
@@ -289,6 +246,91 @@ export default function Feed() {
         articleId={selectedId}
         onClose={() => setSelectedId(null)}
       />
+
+      {/* Category Modal — centered, ~75% viewport */}
+      {modalOpen && (
+        <div
+          ref={modalRef}
+          className="fixed inset-0 z-50 flex items-center justify-center animate-popIn"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="categories-heading"
+        >
+          {/* Dimmed backdrop */}
+          <div
+            className="absolute inset-0 bg-ink/60 backdrop-blur-sm"
+            onClick={() => setModalOpen(false)}
+            aria-hidden="true"
+          />
+          {/* Modal content */}
+          <div
+            ref={modalContentRef}
+            className="relative w-[75vw] max-w-[600px] h-[75vh] max-h-[500px] rounded-3xl border border-ink/10 bg-frost/95 backdrop-blur-xl soft-shadow-lg flex flex-col overflow-hidden"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-ink/10">
+              <h2 id="categories-heading" className="font-display text-lg font-bold tracking-wider">
+                CATEGORIES
+              </h2>
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="shrink-0 rounded-xl p-1.5 text-muted hover:text-ink hover:bg-ink/5 transition"
+                aria-label="Close categories"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Category grid */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              {/* All category */}
+              <button
+                type="button"
+                role="option"
+                aria-selected={isCategorySelected(null)}
+                onClick={() => handleCategorySelect(null)}
+                className={`w-full rounded-2xl px-4 py-3 text-left font-medium transition ${
+                  isCategorySelected(null)
+                    ? "bg-ink/10 text-ink"
+                    : "text-muted hover:bg-ink/5"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span>All</span>
+                  {isCategorySelected(null) && <X size={16} className="text-ink/60 shrink-0" />}
+                </div>
+              </button>
+
+              {/* Divider */}
+              <div className="my-4 border-t border-ink/10" />
+
+              {/* Category grid - 2 columns on larger screens, 1 on mobile */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {feed.categories.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    role="option"
+                    aria-selected={isCategorySelected(cat)}
+                    onClick={() => handleCategorySelect(cat)}
+                    className={`rounded-2xl px-4 py-3 text-left font-medium transition ${
+                      isCategorySelected(cat)
+                        ? "bg-ink/10 text-ink"
+                        : "bg-frost/50 text-muted hover:bg-ink/5 border border-ink/10"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>{cat}</span>
+                      {isCategorySelected(cat) && <X size={16} className="text-ink/60 shrink-0" />}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
