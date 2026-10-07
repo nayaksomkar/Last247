@@ -1,318 +1,41 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Clock3, Database, RefreshCw } from "lucide-react";
+import { ChevronDown, Clock3, Database, RefreshCw, SearchX } from "lucide-react";
+import { OPEN_ARTICLE_EVENT } from "@/lib/events";
+import { useNewsFeed } from "@/lib/hooks";
 import FeaturedStory from "./FeaturedStory";
 import StoryCard from "./StoryCard";
-import NewsReaderAside, { type NewsStory } from "./NewsReaderAside";
+import ArticleReader from "./ArticleReader";
 
-/**
- * Normalized article as delivered by the Last247 backend (`GET /api/news`),
- * which reads stored news from the database. Which provider originally supplied
- * a story is irrelevant here — the UI only renders the normalized shape.
- */
-type NewsArticle = {
-  source: {
-    id: string | null;
-    name: string;
-  };
-  title: string;
-  description: string | null;
-  url: string;
-  urlToImage: string | null;
-  publishedAt: string;
-  content: string | null;
-  author: string | null;
-};
-
-type NewsFeedResponse = {
-  status: string;
-  totalResults: number;
-  articles: NewsArticle[];
-  meta?: {
-    counts?: { returned: number; skipped: number };
-  };
-};
-
-/**
- * Database-backed feed states.
- * - `loading`     request in flight
- * - `ready`       articles received
- * - `empty`       database holds no news yet (awaiting the next ingestion cycle)
- * - `unavailable` database could not be read
- * - `invalid`     rows exist but none of them could be rendered
- */
-type FeedState = "loading" | "ready" | "empty" | "unavailable" | "invalid";
-
-/** Final render guard against malformed records in the payload. */
-function isRenderableArticle(article: NewsArticle): boolean {
-  return (
-    Boolean(article) &&
-    typeof article.title === "string" &&
-    article.title.trim().length > 0 &&
-    typeof article.url === "string" &&
-    !Number.isNaN(new Date(article.publishedAt).getTime())
-  );
-}
-
-function getCategory(title: string, description: string | null): NewsStory["category"] {
-  const text = `${title} ${description ?? ""}`.toLowerCase();
-
-  const technologyKeywords = [
-    "ai",
-    "artificial intelligence",
-    "technology",
-    "tech",
-    "google",
-    "microsoft",
-    "apple",
-    "openai",
-    "nvidia",
-    "chip",
-    "software",
-    "robot",
-    "cyber",
-    "iphone",
-    "android",
-  ];
-
-  const businessKeywords = [
-    "market",
-    "stock",
-    "stocks",
-    "economy",
-    "economic",
-    "business",
-    "company",
-    "companies",
-    "bank",
-    "finance",
-    "financial",
-    "investor",
-    "investment",
-    "trade",
-    "oil price",
-  ];
-
-  const scienceKeywords = [
-    "science",
-    "scientist",
-    "scientists",
-    "research",
-    "researchers",
-    "study",
-    "space",
-    "nasa",
-    "climate",
-    "physics",
-    "biology",
-    "medicine",
-    "discovery",
-  ];
-
-  if (technologyKeywords.some((keyword) => text.includes(keyword))) {
-    return "Technology";
-  }
-
-  if (businessKeywords.some((keyword) => text.includes(keyword))) {
-    return "Business";
-  }
-
-  if (scienceKeywords.some((keyword) => text.includes(keyword))) {
-    return "Science";
-  }
-
-  return "World";
-}
-
-function getAccent(category: NewsStory["category"]): NewsStory["accent"] {
-  switch (category) {
-    case "Technology":
-      return "blue";
-
-    case "Business":
-      return "amber";
-
-    case "Science":
-      return "green";
-
-    case "World":
-    default:
-      return "red";
-  }
-}
-
-function getTimeAgo(date: string) {
-  const published = new Date(date).getTime();
-  const now = Date.now();
-
-  const difference = Math.max(0, now - published);
-
-  const minutes = Math.floor(difference / (1000 * 60));
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (minutes < 1) {
-    return "Just now";
-  }
-
-  if (minutes < 60) {
-    return `${minutes} min ago`;
-  }
-
-  if (hours < 24) {
-    return `${hours}h ago`;
-  }
-
-  return `${days}d ago`;
-}
-
-function getReadTime(article: NewsArticle) {
-  const text = `${article.description ?? ""} ${article.content ?? ""}`;
-
-  const words = text.trim().split(/\s+/).filter(Boolean).length;
-
-  const minutes = Math.max(1, Math.ceil(words / 200));
-
-  if (minutes === 1) {
-    return "1 min read";
-  }
-
-  return `${minutes} min read`;
-}
-
-function convertArticleToStory(article: NewsArticle): NewsStory {
-  const category = getCategory(
-    article.title,
-    article.description
-  );
-
-  return {
-    category,
-
-    title: article.title,
-
-    summary:
-      article.description ||
-      "No summary is available for this story.",
-
-    source: article.source.name,
-
-    time: getTimeAgo(article.publishedAt),
-
-    readTime: getReadTime(article),
-
-    accent: getAccent(category),
-
-    image: article.urlToImage || undefined,
-
-    body: article.content
-      ? [
-          article.description || "",
-          article.content
-            .replace(/\[\+\d+ chars\]/, "")
-            .trim(),
-        ].filter(Boolean)
-      : article.description
-        ? [article.description]
-        : undefined,
-
-    sources: [
-      {
-        name: article.source.name,
-        url: article.url,
-      },
-    ],
-  };
-}
+const selectClasses =
+  "rounded-full border border-border bg-card px-3.5 py-2 text-xs font-medium text-foreground transition hover:border-foreground/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue/50 disabled:cursor-not-allowed disabled:opacity-50";
 
 export default function TopStories() {
-  const [stories, setStories] = useState<NewsStory[]>([]);
-  const [selectedStory, setSelectedStory] =
-    useState<NewsStory | null>(null);
+  const feed = useNewsFeed();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const [feedState, setFeedState] = useState<FeedState>("loading");
-  const [skipped, setSkipped] = useState(0);
-  const [attempt, setAttempt] = useState(0);
-
+  // Story cards ask the reader to open by ID.
   useEffect(() => {
-    let cancelled = false;
+    const onOpen = (event: Event) => {
+      const detail = (event as CustomEvent<{ id: string }>).detail;
+      if (detail?.id) setSelectedId(detail.id);
+    };
 
-    async function loadNews() {
-      setFeedState("loading");
-
-      try {
-        // The only data source. Last247 never calls a news provider itself.
-        const response = await fetch("/api/news", { cache: "no-store" });
-
-        if (!response.ok) {
-          if (!cancelled) setFeedState("unavailable");
-          return;
-        }
-
-        const data: NewsFeedResponse = await response.json();
-
-        if (data?.status !== "ok" || !Array.isArray(data?.articles)) {
-          if (!cancelled) setFeedState("unavailable");
-          return;
-        }
-
-        const renderable = data.articles.filter(isRenderableArticle);
-        const dropped = data.meta?.counts?.skipped ?? 0;
-        const skippedCount = dropped + (data.articles.length - renderable.length);
-
-        if (cancelled) return;
-
-        setStories(renderable.map(convertArticleToStory));
-        setSkipped(skippedCount);
-        setFeedState(
-          renderable.length > 0
-            ? "ready"
-            : skippedCount > 0
-              ? "invalid"
-              : "empty"
-        );
-      } catch {
-        if (!cancelled) setFeedState("unavailable");
-      }
-    }
-
-    loadNews();
+    window.addEventListener(OPEN_ARTICLE_EVENT, onOpen);
 
     return () => {
-      cancelled = true;
+      window.removeEventListener(OPEN_ARTICLE_EVENT, onOpen);
     };
-    // `attempt` re-runs the request when the user retries.
-  }, [attempt]);
-
-  useEffect(() => {
-    const handler = (event: Event) => {
-      const customEvent = event as CustomEvent<NewsStory>;
-
-      setSelectedStory(customEvent.detail);
-    };
-
-    window.addEventListener(
-      "last247:open-story",
-      handler
-    );
-
-    return () => {
-      window.removeEventListener(
-        "last247:open-story",
-        handler
-      );
-    };
+    // The listener is registered once; OPEN_ARTICLE_EVENT is a stable global.
   }, []);
+
+  const isLoading = feed.status === "loading";
 
   return (
     <>
-      <section
-        id="latest"
-        className="scroll-mt-24 py-20 sm:py-28"
-      >
+      <section id="latest" className="scroll-mt-24 py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
-
           {/* Section heading */}
           <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
             <div>
@@ -332,38 +55,86 @@ export default function TopStories() {
             </div>
 
             <div className="flex flex-col items-start gap-2 sm:items-end">
-              <div className="flex items-center gap-3 text-xs text-muted">
+              <div
+                className="flex items-center gap-3 text-xs text-muted"
+                aria-live="polite"
+              >
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${
-                    feedState === "ready"
-                      ? "animate-pulse bg-green"
-                      : "bg-muted"
+                    feed.status === "ready" ? "animate-pulse bg-green" : "bg-muted"
                   }`}
                 />
 
                 <span>
-                  {feedState === "loading"
+                  {isLoading
                     ? "Loading news..."
-                    : feedState === "ready"
-                      ? `${stories.length} stories available`
-                      : feedState === "unavailable"
-                        ? "Feed unavailable"
-                        : "No stories yet"}
+                    : feed.status === "ready"
+                      ? `Showing ${feed.visible.length} of ${feed.total} stories`
+                      : feed.status === "empty"
+                        ? "No stories yet"
+                        : "Feed unavailable"}
                 </span>
               </div>
-
-              {feedState === "ready" && skipped > 0 && (
-                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
-                  {skipped} record{skipped !== 1 ? "s" : ""} skipped
-                </span>
-              )}
             </div>
           </div>
 
-          {/* Loading */}
-          {feedState === "loading" && (
-            <div className="mt-9 grid gap-4 lg:grid-cols-12">
+          {/* Filters — category and source are the only filters the API supports */}
+          <div className="mt-8 flex flex-wrap items-center gap-2.5">
+            <div>
+              <label className="sr-only" htmlFor="filter-category">
+                Filter by category
+              </label>
+              <select
+                id="filter-category"
+                value={feed.category}
+                onChange={(event) => feed.changeCategory(event.target.value)}
+                disabled={isLoading && feed.filterOptions.categories.length === 0}
+                className={selectClasses}
+              >
+                <option value="">All categories</option>
+                {feed.filterOptions.categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </div>
 
+            <div>
+              <label className="sr-only" htmlFor="filter-source">
+                Filter by source
+              </label>
+              <select
+                id="filter-source"
+                value={feed.source}
+                onChange={(event) => feed.changeSource(event.target.value)}
+                disabled={isLoading && feed.filterOptions.sources.length === 0}
+                className={selectClasses}
+              >
+                <option value="">All sources</option>
+                {feed.filterOptions.sources.map((source) => (
+                  <option key={source} value={source}>
+                    {source}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={feed.refresh}
+              disabled={isLoading}
+              aria-label="Refresh stories"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2 text-xs font-semibold text-foreground transition hover:border-blue/30 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
+              Refresh
+            </button>
+          </div>
+
+          {/* Loading */}
+          {isLoading && (
+            <div className="mt-9 grid gap-4 lg:grid-cols-12">
               <div className="min-h-115 animate-pulse rounded-3xl border border-border/70 bg-card/50 lg:col-span-7" />
 
               <div className="space-y-4 lg:col-span-5">
@@ -374,12 +145,11 @@ export default function TopStories() {
                   />
                 ))}
               </div>
-
             </div>
           )}
 
-          {/* Database unavailable */}
-          {feedState === "unavailable" && (
+          {/* Unavailable — network, health, or server error */}
+          {feed.status === "unavailable" && (
             <div className="mt-9 rounded-2xl border border-border/70 bg-card/50 p-8 text-center">
               <Database size={20} className="mx-auto text-muted" />
 
@@ -387,14 +157,17 @@ export default function TopStories() {
                 The news feed is temporarily unavailable
               </p>
 
-              <p className="mt-2 text-sm text-muted">
-                We couldn&apos;t reach the news store. Please try again in a
-                moment.
+              <p
+                className="mx-auto mt-2 max-w-md text-sm text-muted"
+                role="alert"
+              >
+                {feed.error?.message ??
+                  "We couldn't reach the news store. Please try again in a moment."}
               </p>
 
               <button
                 type="button"
-                onClick={() => setAttempt((value) => value + 1)}
+                onClick={feed.refresh}
                 className="mt-5 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold transition hover:border-blue/30"
               >
                 <RefreshCw size={12} />
@@ -403,108 +176,145 @@ export default function TopStories() {
             </div>
           )}
 
-          {/* Database has no news yet */}
-          {feedState === "empty" && (
+          {/* Empty — the API returned zero articles */}
+          {feed.status === "empty" && (
             <div className="mt-9 rounded-2xl border border-border/70 bg-card/50 p-8 text-center">
               <Clock3 size={20} className="mx-auto text-muted" />
 
               <p className="mt-4 font-semibold text-foreground">
-                No stories have been collected yet
+                No stories available.
               </p>
 
               <p className="mt-2 text-sm text-muted">
-                The feed is empty for now. Stories appear here as soon as the
-                next collection cycle finishes.
+                The feed is empty for now. Stories appear here as soon as
+                the next collection cycle finishes.
               </p>
             </div>
           )}
 
-          {/* Stored records could not be rendered */}
-          {feedState === "invalid" && (
-            <div className="mt-9 rounded-2xl border border-border/70 bg-card/50 p-8 text-center">
-              <Clock3 size={20} className="mx-auto text-muted" />
-
-              <p className="mt-4 font-semibold text-foreground">
-                No stories could be displayed
-              </p>
-
-              <p className="mt-2 text-sm text-muted">
-                The most recent records are incomplete. Fresh stories will
-                appear once the next collection cycle finishes.
-              </p>
-            </div>
-          )}
-
-          {/* Stories */}
-          {feedState === "ready" && stories.length > 0 && (
+          {/* Stories — rendered from the articles fetched from GET /api/news */}
+          {feed.status === "ready" && feed.articles.length > 0 && (
             <div className="mt-9 grid gap-4 lg:grid-cols-12 lg:items-stretch">
-
-              {/* Featured story */}
-              <div className="lg:col-span-7">
-                <FeaturedStory story={stories[0]} />
-              </div>
-
-              {/* Scrollable stories */}
-              <div className="relative min-h-0 lg:col-span-5">
-
-                {/* Top fade */}
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-0 top-0 z-10 h-10 rounded-t-2xl bg-linear-to-b from-background to-transparent"
-                />
-
-                {/* Bottom fade */}
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 rounded-b-2xl bg-linear-to-t from-background to-transparent"
-                />
-
-                <div className="stories-scroll relative h-115 space-y-4 overflow-y-auto overscroll-contain pr-2 snap-y snap-mandatory scroll-py-2">
-
-                  {stories.slice(1).map((story, index) => (
-                    <div
-                      key={`${story.title}-${index}`}
-                      className="snap-start"
-                    >
-                      <StoryCard {...story} />
-                    </div>
-                  ))}
-
-                </div>
-
-                {/* Scroll indicator */}
-                {stories.length > 3 && (
-                  <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 hidden -translate-x-1/2 items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted backdrop-blur-md sm:flex">
-                    <span className="h-1 w-1 rounded-full bg-muted" />
-                    Scroll for more
+              {feed.visible.length > 0 ? (
+                <>
+                  {/* Featured story — first article returned by the backend */}
+                  <div className="lg:col-span-7">
+                    <FeaturedStory article={feed.visible[0]} />
                   </div>
+
+                  {/* Scrollable stories */}
+                  <div className="relative min-h-0 lg:col-span-5">
+                    {/* Top fade */}
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 top-0 z-10 h-10 rounded-t-2xl bg-linear-to-b from-background to-transparent"
+                    />
+
+                    {/* Bottom fade */}
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 rounded-b-2xl bg-linear-to-t from-background to-transparent"
+                    />
+
+                    <div className="stories-scroll relative h-115 space-y-4 overflow-y-auto overscroll-contain pr-2 snap-y snap-mandatory scroll-py-2">
+                      {feed.visible.slice(1).map((article) => (
+                        <div key={article.id} className="snap-start">
+                          <StoryCard article={article} />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Scroll indicator */}
+                    {feed.visible.length > 3 && (
+                      <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 hidden -translate-x-1/2 items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted backdrop-blur-md sm:flex">
+                        <span className="h-1 w-1 rounded-full bg-muted" />
+                        Scroll for more
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                /* Client-side filter matched nothing in the fetched articles */
+                <div className="lg:col-span-12">
+                  <div className="rounded-2xl border border-border/70 bg-card/50 p-8 text-center">
+                    <SearchX size={20} className="mx-auto text-muted" />
+
+                    <p className="mt-4 font-semibold text-foreground">
+                      No stories match the selected filters
+                    </p>
+
+                    <p className="mt-2 text-sm text-muted">
+                      Try a different category or source.
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={feed.clearFilters}
+                      className="mt-5 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold transition hover:border-blue/30"
+                    >
+                      Clear filters
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Load more — offset pagination via GET /api/news */}
+              <div className="lg:col-span-12">
+                {feed.loadMoreError && (
+                  <p
+                    role="alert"
+                    className="mb-3 text-center text-xs font-medium text-red"
+                  >
+                    {feed.loadMoreError.message}{" "}
+                    <button
+                      type="button"
+                      onClick={feed.loadMore}
+                      className="font-bold underline underline-offset-2 hover:text-foreground"
+                    >
+                      Retry
+                    </button>
+                  </p>
+                )}
+
+                {feed.hasMore ? (
+                  <button
+                    type="button"
+                    onClick={feed.loadMore}
+                    disabled={feed.loadingMore}
+                    className="mx-auto flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-card/60 px-6 text-sm font-semibold text-foreground transition hover:border-foreground/30 hover:bg-card disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {feed.loadingMore ? (
+                      <>
+                        <RefreshCw size={13} className="animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        Load more
+                        <ChevronDown size={14} />
+                        <span className="text-muted">
+                          ({feed.total - feed.articles.length} remaining)
+                        </span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <p className="text-center text-xs text-muted">
+                    You’ve reached the end — all {feed.total} stories are
+                    shown.
+                  </p>
                 )}
               </div>
             </div>
           )}
-
-          {/* Bottom meta */}
-          {feedState === "ready" && stories.length > 0 && (
-            <div className="mt-8 flex flex-col gap-3 border-t border-border/60 pt-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
-
-              <span>
-                Click any story to read the briefing without leaving the page.
-              </span>
-
-              <span>
-                Summary of stories
-              </span>
-
-            </div>
-          )}
-
         </div>
       </section>
 
-      {/* Story reader sidebar */}
-      <NewsReaderAside
-        story={selectedStory}
-        onClose={() => setSelectedStory(null)}
+      {/* Story reader — fetches GET /api/news/{id}. Remounts per article. */}
+      <ArticleReader
+        key={selectedId ?? "closed"}
+        articleId={selectedId}
+        onClose={() => setSelectedId(null)}
       />
     </>
   );

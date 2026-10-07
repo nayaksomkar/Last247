@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useHealth } from "@/lib/hooks";
 
 export default function Navbar() {
   const [darkMode, setDarkMode] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const health = useHealth();
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
@@ -68,6 +70,32 @@ export default function Navbar() {
 
         {/* Right side controls */}
         <div className="flex items-center gap-2">
+
+          {/* Backend health (GET /health) */}
+          <div
+            className="hidden items-center gap-1.5 rounded-full border border-border/80 bg-background/50 px-2.5 py-1.5 sm:flex"
+            role="status"
+            aria-live="polite"
+            title="Backend /health status"
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                health.status === "up"
+                  ? "bg-green"
+                  : health.status === "down"
+                    ? "bg-red"
+                    : "bg-muted"
+              }`}
+            />
+
+            <span className="text-[11px] font-medium text-muted">
+              {health.status === "up"
+                ? "Live"
+                : health.status === "down"
+                  ? "Offline"
+                  : "Checking"}
+            </span>
+          </div>
 
           {/* Theme toggle */}
           {mounted && (

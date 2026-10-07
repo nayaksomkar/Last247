@@ -2,35 +2,40 @@
 
 > A 24-hour global news briefing **frontend/UI** project built with **Next.js 16**, **React 19**, **TypeScript**, and **Tailwind CSS v4**.
 
-This repository is a **local development UI project**. It runs entirely on your machine — no Docker, no cloud account, no production infrastructure.
+This repository is the **frontend**. It talks to the Last247 **Python backend** (FastAPI, repo `OrcaDeLast247`) over HTTP. `UI_API_INTEGRATION.md` is the single source of truth for every endpoint, schema, and behavior the UI relies on.
 
 ---
 
 ## Overview
 
-Last247 renders a briefing of the most important stories from the last 24 hours.
+Last247 renders the most important stories from the last 24 hours. News is fetched, LLM-processed, and stored by the Python backend (the only component that talks to news providers, LLMPing, and the Turso database); the frontend only ever reads the final processed articles through the backend's JSON API.
 
-The application is **database-first**. News is collected continuously by a **separate ingestion service** and stored in a **Turso (libSQL) database**. This repository only ever *reads* that stored news and presents it.
+### Architecture
 
-- **Purpose**: Present stored news clearly — categories, timestamps, sources, and an in-app reader.
-- **Responsibility**: Request the normalized feed from the backend and render it.
-- **Out of scope**: Collecting news, choosing news sources, and processing external APIs.
+```text
+News providers
+→ Python Orchestrator (OrcaDeLast247, FastAPI)
+→ LLMPing (LLM parse)
+→ Turso
+→ HTTP API
+→ Next.js UI (this repo)
+```
 
 ### What the frontend does
 
-- Renders the lead story, the story list, categories, relative timestamps, and read times.
-- Opens the story reader drawer.
-- Handles loading, unavailable, empty, and malformed-record states.
+- Checks backend liveness via `GET /health` (status pill in the navbar).
+- Fetches the paginated feed via `GET /api/news` with `limit`/`offset` pagination and exact-match `category`/`source` filters.
+- Opens the story reader drawer, which fetches the full article via `GET /api/news/{id}` (handles 404 `NOT_FOUND`).
+- Shows database statistics and the last ingestion run via `GET /api/stats`.
+- Handles loading (skeletons), empty, validation (422), network, and server-error states with retry actions.
 - Switches between light and dark themes.
 
 ### What the frontend never does
 
-- No news-provider API keys, and no provider selection.
-- No calls to NewsAPI, GNews, NewsData.io, or any other external news API.
-- No triggering of the ingestion service.
-- No fallback to an external API when the database is empty.
-
-If the database has nothing to show, the UI says so. It never goes looking for news itself.
+- No news-provider API keys, no calls to NewsAPI/GNews/NewsData.io/LLMPing/Turso.
+- No direct database access — DB credentials stay in the Python backend.
+- No text search or user-configurable sorting — the backend doesn't provide them (fixed newest-first ordering).
+- No authentication — the backend has none.
 
 ---
 
@@ -38,251 +43,153 @@ If the database has nothing to show, the UI says so. It never goes looking for n
 
 | Layer | Technology | Notes |
 | :--- | :--- | :--- |
-| Framework | **Next.js 16.3** (App Router) | Serves the UI and the `/api/news` route handler. Turbopack is the default builder. |
+| Framework | **Next.js 16.3** (App Router) | Turbopack is the default builder. |
 | UI library | **React 19.2** | Client components in `app/components/`. |
-| Language | **TypeScript 5** | `strict` mode, configured in `tsconfig.json`. |
-| Styling | **Tailwind CSS v4** | CSS-first configuration in `app/globals.css` (no `tailwind.config.js`). |
+| Language | **TypeScript 5** | `strict` mode. |
+| Styling | **Tailwind CSS v4** | CSS-first configuration in `app/globals.css`. |
 | Icons | **lucide-react** | Inline SVG icon set. |
 | Fonts | `next/font/google` → Plus Jakarta Sans | Loaded in `app/layout.tsx`. |
-| Database client | **@libsql/client 0.18** | Reads the Turso database. Used only server-side, in `app/api/news/db.ts`. |
 | Linting | **ESLint 9** + `eslint-config-next` | `npm run lint`. |
+| Testing | **bun** (API contract checks) | `npm run test` → `scripts/test-api.ts`. |
 | Package manager | **npm** | `package-lock.json` is the committed lockfile. |
-| Testing | — | No test runner is configured. |
-| Docker / CI / Cloud | — | **Not part of this project.** |
 
 ---
 
-## Local Development
+## Quick Start
 
-### Prerequisites
+### 1. Start the backend (server)
 
-- **Node.js 20.9+** (Next.js 16 requires 20.9 or newer; this project is developed on Node 22).
-- **npm 10+**.
-
-### Steps
+Two options — the frontend works with either:
 
 ```bash
-# 1. Install dependencies
-npm install
+# Option A — use the deployed backend (default, zero setup)
+# .env.local already points to https://orcadelast247.onrender.com — skip to step 2.
 
-# 2. Configure the database connection
-cp .env.example .env.local
-# then edit .env.local:
-#   TURSO_DATABASE_URL=libsql://your-database.turso.io
-#   TURSO_AUTH_TOKEN=your-token        # remote databases only
-#
-# For offline UI work you can point at a local file instead:
-#   TURSO_DATABASE_URL=file:./news.db
-
-# 3. Start the dev server
-npm run dev
+# Option B — run the backend locally (in the sibling OrcaDeLast247 repo, using uv)
+cd ../OrcaDeLast247
+uv sync                       # install deps (creates .venv)
+cp .env.example .env          # then edit .env (TURSO_DATABASE_URL, provider keys)
+uv run python main.py         # API server on http://localhost:8080
 ```
 
-Open **http://localhost:3000**.
+For Option B, set `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080` in `.env.local` (step 2).
 
-### Scripts
+### 2. Start the UI
 
-| Command | What it does |
-| :--- | :--- |
-| `npm run dev` | Starts the dev server on http://localhost:3000 with hot reload. |
-| `npm run build` | Creates an optimized production build in `.next/`. |
-| `npm run start` | Serves the production build locally on http://localhost:3000. |
-| `npm run lint` | Runs ESLint. |
+```bash
+npm install                   # install dependencies
+
+cp .env.example .env.local    # skip editing if using the deployed backend (Option A)
+
+npm run dev                   # dev server on http://localhost:3000
+```
+
+Open **http://localhost:3000**. Note: `NEXT_PUBLIC_*` variables are inlined into the client bundle at build time — restart the dev server (or rebuild) after changing them.
+
+### Verify it's working
+
+```bash
+curl -s https://orcadelast247.onrender.com/health          # {"status":"ok",...}
+curl -s "https://orcadelast247.onrender.com/api/news?limit=3"
+```
 
 ### Environment variables
 
 | Variable | Required | Purpose |
 | :--- | :--- | :--- |
-| `TURSO_DATABASE_URL` | Yes | Turso connection string, or `file:./news.db` for local work. |
-| `TURSO_AUTH_TOKEN` | Remote only | Turso auth token. Leave empty for a local file. |
+| `NEXT_PUBLIC_API_BASE_URL` | Yes | Base URL of the Python backend. Falls back to `http://localhost:8080`. |
 
-These are the **only** environment variables this project reads. `.env.local` is git-ignored, and `.env.example` documents the shape.
+This is the **only** environment variable this project reads. No secrets are needed — the backend holds the database and provider credentials.
 
 ---
 
-## Architecture
+## Python Backend (OrcaDeLast247)
 
-```mermaid
-flowchart LR
-    User["User opens Last247"]
-    UI["Frontend<br/>(React 19 client components)"]
-    API["GET /api/news<br/>(Next.js route handler)"]
-    DB[("Turso / libSQL<br/>articles table")]
-    Ingest["Ingestion service<br/>(separate Go repository)"]
+The backend is a separate FastAPI service that fetches news (NewsAPI → GNews → NewsData.io → WebFetch fallback), parses each article via the LLMPing LLM Brain, stores the result in Turso, and serves this API. It ingests automatically at startup and every 8 hours — the UI never triggers ingestion for normal operation.
 
-    User --> UI
-    UI -->|1. request the feed| API
-    API -->|2. read latest articles| DB
-    DB -->|3. stored articles| API
-    API -->|4. normalized JSON| UI
-    UI -->|5. render the briefing| User
-    Ingest -.->|writes articles| DB
+### Backend quick start (in the `OrcaDeLast247` repo, using uv)
+
+```bash
+cd ../OrcaDeLast247
+
+# 1. Install dependencies (creates .venv, respects uv.lock)
+uv sync
+
+# 2. Configure environment
+cp .env.example .env
+# then edit .env: TURSO_DATABASE_URL, provider key(s), CORS_ALLOW_ORIGINS
+
+# 3. Run the API server (default port 8080)
+uv run python main.py
 ```
 
-**The ingestion service is not part of this repository.** It is a separate Go service that collects news on a schedule and writes rows into the database. Last247 only ever reads.
+### Backend testing
 
-### Request flow
-
-```text
-User opens Last247
-        ↓
-Frontend requests /api/news
-        ↓
-Backend reads Turso
-        ↓
-Frontend receives stored news
-        ↓
-UI renders Last247 feed
+```bash
+uv run pytest   # self-contained: no network, no real API keys required
 ```
 
-### The `articles` table
+### Backend env vars (summary)
 
-`GET /api/news` reads a single table. The ingestion service owns it; Last247 only selects from it.
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `TURSO_DATABASE_URL` | — (required) | Turso URL (`libsql://…`) or local file (`file:./news.db`). |
+| `MAX_ARTICLES` | `7` | Articles fetched + LLM-parsed per run. |
+| `INGEST_INTERVAL` | `8h` | Background ingestion cadence (3 runs/day). |
+| `RETENTION_DAYS` | `7` | Rolling article window; older rows deleted. |
+| `CORS_ALLOW_ORIGINS` | `*` | Allowed origins for this frontend. |
+| `SAMPLE_DATA` | `false` | `true`: feed bundled sample data through the same pipeline (testing). |
 
-```sql
-CREATE TABLE articles (
-  id           TEXT PRIMARY KEY,
-  source_id    TEXT,
-  source_name  TEXT NOT NULL,
-  title        TEXT NOT NULL,
-  description  TEXT,
-  content      TEXT,
-  url          TEXT NOT NULL,
-  url_to_image TEXT,
-  author       TEXT,
-  published_at TEXT NOT NULL,   -- ISO 8601
-  ingested_at  TEXT             -- ISO 8601, used as a fallback timestamp
-);
+See `OrcaDeLast247/README.md` for the full list.
 
-CREATE INDEX idx_articles_published_at ON articles (published_at DESC);
-```
+---
 
-The query is deliberately simple — the 20 most recent articles, newest first:
+## Deploy to Vercel
 
-```sql
-SELECT * FROM articles ORDER BY published_at DESC LIMIT 20;
-```
+The frontend is a standard Next.js (App Router) app — no special config needed.
 
-If your database uses different column names, adjust `SELECT_LATEST` in `app/api/news/db.ts` and the field reads in `app/api/news/normalize.ts`. Nothing else needs to change.
+1. **Push to GitHub** (remote `origin` is already set):
+
+   ```bash
+   git add -A
+   git commit -m "Wire UI to the Python backend API"
+   git push origin main
+   ```
+
+2. **Import the repo on [vercel.com](https://vercel.com/new)** — Vercel auto-detects Next.js. Build command (`next build`) and output are defaults; don't change them.
+
+3. **Add the environment variable** in *Project → Settings → Environment Variables*:
+
+   | Variable | Value |
+   | :--- | :--- |
+   | `NEXT_PUBLIC_API_BASE_URL` | `https://orcadelast247.onrender.com` |
+
+   This is the **only** variable the project needs. No secrets — the backend holds all credentials.
+
+4. **Deploy.** `NEXT_PUBLIC_*` variables are inlined at build time — redeploy after changing them.
+
+### GitHub-readiness checklist
+
+- `.gitignore` excludes `.env*` (secrets never committed) — `.env.example` is the committed template.
+- `.env.example` contains no real keys — only the public backend URL.
+- `npm run lint` (ESLint) and `npm run test` (API contract checks via bun) are documented and runnable.
+- Single env var, no build-time secrets, no server-side config needed.
 
 ---
 
 ## API Reference
 
-### `GET /api/news`
+See **`UI_API_INTEGRATION.md`** for the complete, verified contract. Summary:
 
-The only endpoint the frontend calls. A read-only projection of the database.
-
-- **Method**: `GET`
-- **Auth**: none from the browser — database credentials stay server-side.
-- **Caching**: `Cache-Control: public, s-maxage=60, stale-while-revalidate=300`.
-- **Rendering**: always executed at request time (`dynamic = "force-dynamic"`), so the feed is never baked into a build.
-
-#### Response (`200 OK`)
-
-```json
-{
-  "status": "ok",
-  "totalResults": 20,
-  "articles": [
-    {
-      "source": { "id": "reuters", "name": "Reuters" },
-      "title": "Article title headline",
-      "description": "Short article summary",
-      "url": "https://example.com/story",
-      "urlToImage": "https://example.com/image.jpg",
-      "publishedAt": "2026-09-28T05:00:00Z",
-      "content": "Article body snippet...",
-      "author": "Reuters Staff"
-    }
-  ],
-  "meta": {
-    "counts": { "returned": 20, "skipped": 0 }
-  }
-}
-```
-
-Every article has the same shape regardless of where the story was collected, so the UI never needs to know how it got there. `meta.counts.skipped` reports stored rows that could not be rendered.
-
-#### Error responses
-
-| Status | Body | Meaning |
+| Endpoint | Used by | Notes |
 | :--- | :--- | :--- |
-| `503` | `{"error": "news_unavailable"}` | The database could not be read. |
-| `500` | `{"error": "news_not_configured"}` | `TURSO_DATABASE_URL` is not set. |
+| `GET /health` | Navbar status pill; feed gates its first fetch on it | Does not depend on the database. |
+| `GET /api/news` | `TopStories` (feed) | `limit` (1–100, default 50; outside → 422), `offset` (≥ 0; negative → 422), exact-match `category`/`source`. Always 200 for valid params; empty array when nothing matches. Fixed newest-first ordering. |
+| `GET /api/news/{id}` | `ArticleReader` drawer, `/article/[id]` page | 404 `NOT_FOUND` → "Article not found" state. |
+| `GET /api/stats` | `StatsBar` | `last_ingestion` absent until the first run completes. |
+| `POST /api/ingest` | Admin/internal only | Synchronous, quota-consuming. The UI does not need it. |
 
-Both are deliberately opaque. The details are logged server-side and never shown to the user.
-
-### UI states
-
-`app/components/TopStories.tsx` maps the response to one of five states:
-
-| State | Trigger | What the user sees |
-| :--- | :--- | :--- |
-| `loading` | Request in flight | Skeleton placeholders. |
-| `ready` | `200` with at least one article | The briefing. A muted "N records skipped" note appears if some rows were unreadable. |
-| `empty` | `200`, no articles, nothing skipped | "No stories have been collected yet" — the feed is waiting for the next collection cycle. |
-| `invalid` | `200`, no articles, at least one skipped | "No stories could be displayed" — the stored records are incomplete. |
-| `unavailable` | `503`, `500`, or a network error | "The news feed is temporarily unavailable", with a **Try again** button. |
-
-An empty database **never** triggers a request to any external news API.
-
----
-
-## System Usage
-
-### Frontend (user actions)
-
-| Step | User action | Components | What happens |
-| :--- | :--- | :--- | :--- |
-| **1. Page load** | Opens `http://localhost:3000` | `Navbar`, `Hero`, `TopStories` | Theme is read from `localStorage`/system preference. `TopStories` requests `/api/news`. |
-| **2. Feed display** | Browses the news list | `FeaturedStory`, `StoryCard` | Lead story on the left, the rest in a scrollable column on the right. |
-| **3. Open story** | Clicks any story card | `NewsReaderAside` | Dispatches the `last247:open-story` window event; the drawer slides in and page scroll locks. |
-| **4. Close story** | Presses `Esc` or clicks the backdrop | `NewsReaderAside` | Drawer closes and page scroll unlocks. |
-| **5. Switch theme** | Clicks the sun/moon icon | `Navbar` | Toggles the `.dark` class on `<html>` and updates `localStorage`. |
-
-### Backend (`GET /api/news`)
-
-```
-[Client] ──> GET /api/news
-                │
-                ├── TURSO_DATABASE_URL set?          (no)  ──> 500 news_not_configured
-                │
-                ├── SELECT * FROM articles
-                │     ORDER BY published_at DESC
-                │     LIMIT 20
-                │        ├── query fails            ──> 503 news_unavailable
-                │        └── rows returned
-                │
-                ├── Normalize each row
-                │     ├── missing/placeholder title  ──> skipped
-                │     ├── missing url                ──> skipped
-                │     ├── no usable timestamp       ──> skipped
-                │     │     (published_at, else ingested_at)
-                │     └── otherwise                 ──> normalized article
-                │
-                └── 200 { status, totalResults, articles, meta.counts }
-```
-
-### Article normalization
-
-`app/api/news/normalize.ts` turns a database row into the article shape the UI expects. An article needs three things to be renderable: a real title, a link, and a usable timestamp. Rows missing any of them are counted as `skipped` and left out of the feed — the UI is built around a rolling 24-hour window, so a story with no timestamp cannot be placed in it.
-
----
-
-## Working on the Frontend
-
-- **Source**: `app/components/` and `app/page.tsx`.
-- **Open the drawer from any component**:
-  ```ts
-  window.dispatchEvent(
-    new CustomEvent("last247:open-story", { detail: storyObject })
-  );
-  ```
-- **Theming & colors**: Tailwind v4 tokens live in `app/globals.css`. Beat accents are `bg-blue` / `text-blue` (Technology), `bg-amber` / `text-amber` (Business), `bg-green` / `text-green` (Science), `bg-red` / `text-red` (World).
-- **Offline / mocking tip**: if you have no database available, mock the `articles` array directly in `app/components/TopStories.tsx` while working on layout.
-
-The transformations in `TopStories.tsx` — category keywords, accent mapping, relative timestamps, and read time — are presentation concerns and belong in the UI. Collecting and normalizing incoming data does not.
+Error responses: `{"error": string, "code": string}` (`NOT_FOUND`, `INTERNAL_ERROR`, `INGEST_ERROR`, `INGEST_TIMEOUT`) except FastAPI 422 validation (`{"detail":[...]}`) for invalid `limit`/`offset`.
 
 ---
 
@@ -291,31 +198,31 @@ The transformations in `TopStories.tsx` — category keywords, accent mapping, r
 ```
 .
 ├── app/
-│   ├── api/news/
-│   │   ├── route.ts         # GET /api/news — returns the normalized feed
-│   │   ├── db.ts            # Turso/libSQL client and the articles query
-│   │   ├── normalize.ts     # Row → article mapping, malformed-row filtering
-│   │   └── types.ts         # NewsArticle contract shared with the client
+│   ├── article/[id]/page.tsx     # Article detail page (GET /api/news/{id}, 404 handling)
 │   ├── components/
-│   │   ├── FeaturedStory.tsx   # Lead story card
-│   │   ├── Footer.tsx          # Site footer & back-to-top link
-│   │   ├── Hero.tsx            # Page headline & stats
-│   │   ├── Navbar.tsx          # Navigation & theme toggle
-│   │   ├── NewsReaderAside.tsx # Slide-over story reader drawer
-│   │   ├── StoryCard.tsx       # News feed card item
-│   │   └── TopStories.tsx      # Client orchestrator: fetch, convert, states
-│   ├── globals.css         # Tailwind v4 styles & theme tokens
-│   ├── layout.tsx          # Root layout & Google fonts
-│   └── page.tsx            # Main page composition
-├── public/                 # Static assets (served at the site root)
-├── .env.example            # Environment variable template
-├── .env.local              # Your database credentials (git-ignored)
-├── next.config.ts          # Next.js configuration
-├── package.json            # Dependencies & scripts
-└── tsconfig.json           # TypeScript config
+│   │   ├── ArticleImage.tsx      # image_url renderer with broken-image fallback
+│   │   ├── ArticleReader.tsx     # Slide-over reader; fetches the article by ID
+│   │   ├── FeaturedStory.tsx     # Lead story card
+│   │   ├── Footer.tsx            # Site footer & back-to-top link
+│   │   ├── Hero.tsx              # Page headline
+│   │   ├── Navbar.tsx            # Navigation, theme toggle, /health status pill
+│   │   ├── StatsBar.tsx          # GET /api/stats controls
+│   │   ├── StoryCard.tsx         # News feed card item
+│   │   └── TopStories.tsx        # Feed orchestrator: filters, pagination, states
+│   ├── globals.css               # Tailwind v4 styles & theme tokens
+│   ├── layout.tsx                # Root layout & Google fonts
+│   └── page.tsx                  # Main page composition
+├── lib/
+│   ├── api.ts                    # Typed API service layer (one fn per endpoint)
+│   ├── config.ts                 # API base URL from env
+│   ├── events.ts                 # Cross-component UI events
+│   ├── format.ts                 # Timestamp/read-time formatting
+│   ├── hooks.ts                  # State management hooks
+│   └── types.ts                  # Documented response schemas
+├── scripts/test-api.ts           # Integration checks against the documented contract
+├── UI_API_INTEGRATION.md         # Single source of truth for the API
+└── .env.example                  # Environment variable template
 ```
-
-> `AGENTS.md` and `CLAUDE.md` are generated automatically by `next dev`. They are git-ignored rather than committed.
 
 ---
 
@@ -323,15 +230,16 @@ The transformations in `TopStories.tsx` — category keywords, accent mapping, r
 
 | Problem | Likely cause | Fix |
 | :--- | :--- | :--- |
-| **500 `news_not_configured`** | `TURSO_DATABASE_URL` is not set | Add it to `.env.local` and restart the dev server. |
-| **503 `news_unavailable`** | The database could not be read — bad URL, missing token, or the `articles` table does not exist | Check the server log for the underlying error, then verify the connection string and schema. |
-| **"No stories have been collected yet"** | The `articles` table is empty | Expected. The ingestion service populates it on its own schedule; Last247 will not fetch news to fill the gap. |
-| **"No stories could be displayed"** | Every stored row is missing a title, link, or timestamp | Inspect the rows and fix the ingestion service writing them. |
-| **"N records skipped" note under the feed** | Some recent rows are incomplete | The rest of the feed is still valid. Check `meta.counts.skipped` via the endpoint below. |
-| **Env change not picked up** | Next.js only reads env at startup | Stop and restart the dev server after editing `.env.local`. |
+| **"Feed unavailable" + network error** | The Python backend isn't running or `NEXT_PUBLIC_API_BASE_URL` is wrong | Start the backend (`uv run python main.py`, default port 8080) and verify the base URL in `.env.local`. |
+| **"Live" pill shows "Offline"** | `/health` unreachable | The pill reflects `GET /health` only; check the backend service. |
+| **"No stories have been collected yet"** | Database is empty | Expected before/during ingestion; stories appear after the next run. |
+| **"Article not found"** | 404 `NOT_FOUND` from `GET /api/news/{id}` | The article was removed by the retention sweep or the ID is stale. |
+| **422 on feed fetch** | Invalid `limit`/`offset` (outside 1–100 / negative) | The backend rejects — not clamps — invalid pagination params. |
+| **Env change not picked up** | `NEXT_PUBLIC_*` vars are inlined at build/dev-server start | Restart the dev server after editing `.env.local`. |
 
-Inspect the live feed with:
+Inspect the backend directly:
 
 ```bash
-curl -s http://localhost:3000/api/news
+curl -s http://localhost:8080/health
+curl -s "http://localhost:8080/api/news?limit=20&offset=0"
 ```

@@ -89,27 +89,27 @@ export default function Hero() {
         <div className="mt-16 sm:mt-24">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
             <StatCard
-              value="24h"
+              value="7-day"
               label="Rolling window"
-              detail="Zero stale content"
+              detail="Stale stories auto-removed"
               accentColor="group-hover:text-blue"
             />
             <StatCard
-              value="3 min"
-              label="Read time"
-              detail="Executive summaries"
+              value="4"
+              label="Provider fallback"
+              detail="NewsAPI · GNews · NewsData.io · WebFetch"
               accentColor="group-hover:text-green"
             />
             <StatCard
-              value="50+"
-              label="Sources scanned"
-              detail="Verified publications"
+              value="7"
+              label="Stories per cycle"
+              detail="Curated and LLM-parsed"
               accentColor="group-hover:text-amber"
             />
             <StatCard
               value="24/7"
               label="Always collecting"
-              detail="Continuously updated feed"
+              detail="Automatic background ingestion"
               accentColor="group-hover:text-purple"
             />
           </div>

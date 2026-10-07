@@ -31,12 +31,12 @@ export default function Footer() {
             Feed
           </a>
           <a
-            href="https://devakashsharma.netlify.app/"
+            href="https://nayaksomkar.github.io/portfolio/pages/about.html"
             target="_blank"
             rel="noopener noreferrer"
             className="group inline-flex items-center gap-1 rounded-full px-3 py-1 font-medium text-foreground transition-colors hover:bg-foreground/5 hover:text-blue"
           >
-            <span>Akash</span>
+            <span>@nayaksomkar</span>
             <ArrowUpRight className="h-3 w-3 text-muted transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-blue" />
           </a>
         </nav>

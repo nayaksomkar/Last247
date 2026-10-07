@@ -1,59 +1,21 @@
-import type { NewsStory } from "./NewsReaderAside";
+import type { Article } from "@/lib/types";
+import { UNKNOWN, readMinutes, timeAgo } from "@/lib/format";
+import { openArticle } from "@/lib/events";
+import ArticleImage from "./ArticleImage";
 
-type StoryCardProps = NewsStory;
+export default function StoryCard({ article }: { article: Article }) {
+  const category = article.category || "News";
 
-const categoryStyles = {
-  Business: "bg-amber/10 text-amber border-amber/15",
-  Technology: "bg-blue/10 text-blue border-blue/15",
-  Science: "bg-green/10 text-green border-green/15",
-  World: "bg-red/10 text-red border-red/15",
-};
-
-const accentStyles = {
-  blue: "from-blue/12 via-blue/3 to-transparent",
-  amber: "from-amber/12 via-amber/3 to-transparent",
-  green: "from-green/12 via-green/3 to-transparent",
-  red: "from-red/12 via-red/3 to-transparent",
-  purple: "from-purple/12 via-purple/3 to-transparent",
-};
-
-export default function StoryCard({
-  category,
-  title,
-  summary,
-  source,
-  time,
-  readTime,
-  accent,
-  image,
-  ...story
-}: StoryCardProps) {
   return (
     <button
       type="button"
-      onClick={() =>
-        window.dispatchEvent(
-          new CustomEvent("last247:open-story", {
-            detail: {
-              category,
-              title,
-              summary,
-              source,
-              time,
-              readTime,
-              accent,
-              image,
-              ...story,
-            },
-          }),
-        )
-      }
+      onClick={() => openArticle(article.id)}
       className="group relative isolate block w-full snap-start overflow-hidden rounded-2xl border border-border/70 bg-card/55 p-5 text-left backdrop-blur-xl transition-all duration-500 hover:-translate-y-1 hover:border-border hover:bg-card/75 hover:shadow-[0_18px_50px_rgb(0,0,0,0.06)] dark:hover:shadow-[0_18px_50px_rgb(0,0,0,0.22)]"
     >
       {/* Accent glow */}
       <div
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-x-0 top-0 -z-10 h-32 bg-linear-to-b ${accentStyles[accent]} opacity-70 transition-all duration-500 group-hover:h-44 group-hover:opacity-100`}
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-32 bg-linear-to-b from-blue/12 via-blue/3 to-transparent opacity-70 transition-all duration-500 group-hover:h-44 group-hover:opacity-100"
       />
 
       <div
@@ -62,11 +24,10 @@ export default function StoryCard({
       />
 
       {/* Image */}
-      {image && (
+      {article.image_url && (
         <div className="mb-5 aspect-16/7 overflow-hidden rounded-xl border border-border/50 bg-card">
-          <img
-            src={image}
-            alt=""
+          <ArticleImage
+            src={article.image_url}
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
         </div>
@@ -74,37 +35,39 @@ export default function StoryCard({
 
       {/* Meta */}
       <div className="flex items-center justify-between gap-3">
-        <span
-          className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${categoryStyles[category]}`}
-        >
+        <span className="rounded-full border border-blue/15 bg-blue/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-blue">
           {category}
         </span>
 
         <span className="text-[11px] text-muted">
-          {time}
+          {timeAgo(article.published_at)}
         </span>
       </div>
 
       {/* Headline */}
       <h3 className="mt-5 text-xl font-bold leading-snug tracking-[-0.03em] text-foreground">
-        {title}
+        {article.title}
       </h3>
 
       {/* Summary */}
-      <p className="mt-3 text-sm leading-6 text-muted">
-        {summary}
-      </p>
+      {article.description && (
+        <p className="mt-3 text-sm leading-6 text-muted">
+          {article.description}
+        </p>
+      )}
 
       {/* Footer */}
       <div className="relative mt-6 flex items-center justify-between border-t border-border/70 pt-4">
         <div className="flex items-center gap-2 text-[11px] text-muted">
           <span className="font-semibold text-foreground">
-            {source}
+            {article.source || UNKNOWN}
           </span>
 
           <span>•</span>
 
-          <span>{readTime}</span>
+          <span>
+            {readMinutes(`${article.description ?? ""} ${article.content ?? ""}`)}
+          </span>
         </div>
 
         <span className="-translate-x-1 text-sm text-muted opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100">
