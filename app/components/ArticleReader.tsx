@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { ExternalLink, RefreshCw, X } from "lucide-react";
-import { UNKNOWN, formatUtc, readMinutes, timeAgo } from "@/lib/format";
+import { UNKNOWN, cleanContent, formatUtc, readMinutes, timeAgo } from "@/lib/format";
 import { useArticle } from "@/lib/hooks";
 import ArticleImage from "./ArticleImage";
 
@@ -42,6 +42,15 @@ export default function ArticleReader({ articleId, onClose }: Props) {
 
   if (!articleId) return null;
 
+  // Cleaned for display — never show internal processing markers.
+  const content = article ? cleanContent(article.content ?? "") : "";
+  const summary = article?.description
+    ? cleanContent(article.description)
+    : "";
+  const readTime = article
+    ? readMinutes(`${article.description ?? ""} ${article.content ?? ""}`)
+    : "";
+
   return (
     <div
       className="fixed inset-0 z-50"
@@ -72,7 +81,7 @@ export default function ArticleReader({ articleId, onClose }: Props) {
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {/* Loading — fetching GET /api/news/{id} */}
           {status === "loading" && (
             <div className="space-y-5 px-5 py-7 sm:px-8 sm:py-9">
@@ -172,27 +181,27 @@ export default function ArticleReader({ articleId, onClose }: Props) {
                       <span>{article.author}</span>
                     </>
                   )}
-                  <span>•</span>
-                  <span>
-                    {readMinutes(
-                      `${article.description ?? ""} ${article.content ?? ""}`,
-                    )}
-                  </span>
+                  {readTime && (
+                    <>
+                      <span>•</span>
+                      <span>{readTime}</span>
+                    </>
+                  )}
                   <span>•</span>
                   <span>via {article.provider || UNKNOWN}</span>
                 </div>
 
-                {article.description && (
+                {summary && (
                   <div className="mt-8 rounded-2xl border border-border/70 bg-card/50 p-5 backdrop-blur-xl sm:p-6">
                     <p className="text-base font-medium leading-7 text-foreground">
-                      {article.description}
+                      {summary}
                     </p>
                   </div>
                 )}
 
-                {article.content ? (
+                {content ? (
                   <div className="mt-8 space-y-5 text-sm leading-7 text-muted">
-                    {article.content
+                    {content
                       .split(/\n{2,}/)
                       .map((paragraph) => paragraph.trim())
                       .filter(Boolean)

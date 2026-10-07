@@ -5,6 +5,9 @@ import ArticleImage from "./ArticleImage";
 
 export default function StoryCard({ article }: { article: Article }) {
   const category = article.category || "News";
+  const readTime = readMinutes(
+    `${article.description ?? ""} ${article.content ?? ""}`,
+  );
 
   return (
     <button
@@ -63,11 +66,12 @@ export default function StoryCard({ article }: { article: Article }) {
             {article.source || UNKNOWN}
           </span>
 
-          <span>•</span>
-
-          <span>
-            {readMinutes(`${article.description ?? ""} ${article.content ?? ""}`)}
-          </span>
+          {readTime && (
+            <>
+              <span>•</span>
+              <span>{readTime}</span>
+            </>
+          )}
         </div>
 
         <span className="-translate-x-1 text-sm text-muted opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100">

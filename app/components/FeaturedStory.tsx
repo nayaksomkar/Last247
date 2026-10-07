@@ -5,6 +5,9 @@ import ArticleImage from "./ArticleImage";
 
 export default function FeaturedStory({ article }: { article: Article }) {
   const category = article.category || "News";
+  const readTime = readMinutes(
+    `${article.description ?? ""} ${article.content ?? ""}`,
+  );
 
   return (
     <button
@@ -79,13 +82,12 @@ export default function FeaturedStory({ article }: { article: Article }) {
                 {article.source || UNKNOWN}
               </span>
 
-              <span>•</span>
-
-              <span>
-                {readMinutes(
-                  `${article.description ?? ""} ${article.content ?? ""}`,
-                )}
-              </span>
+              {readTime && (
+                <>
+                  <span>•</span>
+                  <span>{readTime}</span>
+                </>
+              )}
             </div>
 
             <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card/50 px-4 py-2 text-xs font-semibold text-foreground backdrop-blur-md transition-all group-hover:border-blue/25 group-hover:bg-card">

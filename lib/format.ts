@@ -17,10 +17,18 @@ export function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
-/** Rough reading time from description + content text. */
+/** Strips internal processing markers (e.g. "[+2092 chars]") that can ride
+ *  along in LLM-parsed content stored by the backend. */
+export function cleanContent(text: string): string {
+  return text.replace(/\[\+\d+\s*chars\]/gi, "").trim();
+}
+
+/** Rough reading time from actual text; "" when there is nothing to read. */
 export function readMinutes(text: string): string {
-  const words = text.trim().split(/\s+/).filter(Boolean).length;
-  return `${Math.max(1, Math.ceil(words / 200))} min read`;
+  const words = cleanContent(text)
+    .split(/\s+/)
+    .filter(Boolean).length;
+  return words === 0 ? "" : `${Math.max(1, Math.ceil(words / 200))} min read`;
 }
 
 /** Formats an ISO 8601 UTC timestamp for display. */

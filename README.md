@@ -4,6 +4,13 @@
 
 This repository is the **frontend**. It talks to the Last247 **Python backend** (FastAPI, repo `OrcaDeLast247`) over HTTP. `UI_API_INTEGRATION.md` is the single source of truth for every endpoint, schema, and behavior the UI relies on.
 
+## Repositories
+
+| Repo | Role |
+| :--- | :--- |
+| [nayaksomkar/Last247](https://github.com/nayaksomkar/Last247) | **Frontend/UI** (this repo) — Next.js app, consumes the backend JSON API only. |
+| [nayaksomkar/OrcaDeLast247](https://github.com/nayaksomkar/OrcaDeLast247) | **Backend/Orchestrator** — Python FastAPI service: fetches from news providers → LLM-parses via LLMPing → stores in Turso → serves the JSON API. |
+
 ---
 
 ## Overview
@@ -62,8 +69,9 @@ News providers
 Two options — the frontend works with either:
 
 ```bash
-# Option A — use the deployed backend (default, zero setup)
-# .env already points to https://orcadelast247.onrender.com — skip to step 2.
+# Option A — use the deployed backend (zero backend setup)
+# cp .env.example .env, then set NEXT_PUBLIC_API_BASE_URL to the deployed
+# backend URL (Render). Ask the team for it — it is not committed to this repo.
 
 # Option B — run the backend locally (in the sibling OrcaDeLast247 repo, using uv)
 cd ../OrcaDeLast247
@@ -89,8 +97,8 @@ Open **http://localhost:3000**. Note: `NEXT_PUBLIC_*` variables are inlined into
 ### Verify it's working
 
 ```bash
-curl -s https://orcadelast247.onrender.com/health          # {"status":"ok",...}
-curl -s "https://orcadelast247.onrender.com/api/news?limit=3"
+curl -s "$NEXT_PUBLIC_API_BASE_URL/health"          # {"status":"ok",...}
+curl -s "$NEXT_PUBLIC_API_BASE_URL/api/news?limit=3"
 ```
 
 ### Environment variables
@@ -162,7 +170,7 @@ The frontend is a standard Next.js (App Router) app — no special config needed
 
    | Variable | Value |
    | :--- | :--- |
-   | `NEXT_PUBLIC_API_BASE_URL` | `https://orcadelast247.onrender.com` |
+   | `NEXT_PUBLIC_API_BASE_URL` | your deployed backend URL (Render) |
 
    This is the **only** variable the project needs. No secrets — the backend holds all credentials.
 
