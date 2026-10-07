@@ -17,16 +17,11 @@ export default function Feed() {
       <section className="mx-auto w-full max-w-2xl px-3 sm:px-4">
         {/* Section label */}
         <div className="mb-6 flex items-center gap-3 px-1">
-          <span className="h-3 w-3 shrink-0 rounded-full border-2 border-ink bg-pink" />
+          <span className="h-3 w-3 shrink-0 rounded-full bg-pink" />
           <h2 className="shrink-0 font-display text-sm font-bold tracking-wider">
             THE FEED
           </h2>
-          <div className="h-0.5 flex-1 border-t-2 border-dashed border-ink/25" />
-          {feed.status === "ready" && (
-            <span className="shrink-0 text-xs font-semibold text-muted">
-              {feed.total} {feed.total === 1 ? "story" : "stories"}
-            </span>
-          )}
+          <div className="h-px flex-1 bg-ink/15" />
         </div>
 
         {/* Loading */}
@@ -35,7 +30,7 @@ export default function Feed() {
             {Array.from({ length: 4 }).map((_, index) => (
               <div
                 key={index}
-                className="animate-pulse rounded-3xl border-2 border-ink/15 bg-frost p-4 sm:p-5"
+                className="animate-pulse rounded-3xl border border-ink/10 bg-frost p-4 sm:p-5"
               >
                 <div className="flex items-center gap-2.5">
                   <div className="h-7 w-7 rounded-lg bg-ink/10" />
@@ -51,7 +46,7 @@ export default function Feed() {
 
         {/* Unavailable — network or server error */}
         {feed.status === "unavailable" && (
-          <div className="rounded-3xl border-2 border-ink bg-frost p-8 text-center shadow-[5px_5px_0_0_var(--ink)] backdrop-blur-xl">
+          <div className="rounded-3xl border border-ink/10 bg-frost p-8 text-center soft-shadow backdrop-blur-xl">
             <p className="font-display text-lg font-bold">THE WIRE IS DOWN</p>
 
             <p className="mx-auto mt-3 max-w-sm text-sm text-muted" role="alert">
@@ -62,7 +57,7 @@ export default function Feed() {
             <button
               type="button"
               onClick={feed.refresh}
-              className="mt-6 inline-flex items-center gap-2 rounded-full border-2 border-ink bg-yellow px-4 py-2 text-xs font-bold text-[#111] shadow-[3px_3px_0_0_var(--ink)] transition hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_var(--ink)]"
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-yellow px-4 py-2 text-xs font-bold text-[#111] transition hover:-translate-y-0.5 hover:soft-shadow-lg"
             >
               <RefreshCw size={12} />
               Try again
@@ -72,7 +67,7 @@ export default function Feed() {
 
         {/* Empty — the API returned zero articles */}
         {feed.status === "empty" && (
-          <div className="rounded-3xl border-2 border-ink bg-frost p-8 text-center shadow-[5px_5px_0_0_var(--ink)] backdrop-blur-xl">
+          <div className="rounded-3xl border border-ink/10 bg-frost p-8 text-center soft-shadow backdrop-blur-xl">
             <p className="font-display text-lg font-bold">NOTHING YET</p>
 
             <p className="mx-auto mt-3 max-w-sm text-sm text-muted">
@@ -99,13 +94,13 @@ export default function Feed() {
               {feed.loadMoreError && (
                 <p
                   role="alert"
-                  className="mb-3 text-center text-xs font-medium text-pink"
+                  className="mb-3 text-center text-xs font-medium text-muted"
                 >
                   {feed.loadMoreError.message}{" "}
                   <button
                     type="button"
                     onClick={feed.loadMore}
-                    className="font-bold underline underline-offset-2"
+                    className="font-bold text-ink underline underline-offset-2"
                   >
                     Retry
                   </button>
@@ -117,7 +112,7 @@ export default function Feed() {
                   type="button"
                   onClick={feed.loadMore}
                   disabled={feed.loadingMore}
-                  className="mx-auto flex h-11 items-center gap-2 rounded-full border-2 border-ink bg-ink px-6 text-sm font-bold text-paper shadow-[3px_3px_0_0_var(--ink)] transition hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mx-auto flex h-11 items-center gap-2 rounded-full bg-ink px-6 text-sm font-bold text-paper soft-shadow transition hover:-translate-y-0.5 hover:soft-shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {feed.loadingMore ? (
                     <>
@@ -133,7 +128,7 @@ export default function Feed() {
                 </button>
               ) : (
                 <p className="text-center font-display text-[10px] uppercase tracking-widest text-muted">
-                  That’s the whole wire — {feed.total} stories
+                  That’s the whole wire
                 </p>
               )}
             </div>

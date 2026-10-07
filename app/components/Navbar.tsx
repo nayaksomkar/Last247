@@ -30,13 +30,13 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 px-3 pt-3 sm:px-4">
-      <nav className="mx-auto flex h-12 w-full max-w-2xl items-center justify-between rounded-2xl border-2 border-ink bg-frost px-2.5 shadow-[3px_3px_0_0_var(--ink)] backdrop-blur-xl">
+      <nav className="mx-auto flex h-12 w-full max-w-2xl items-center justify-between rounded-full border border-ink/10 bg-frost px-3 soft-shadow backdrop-blur-xl">
         <Link
           href="/"
           className="flex items-center gap-2 px-1"
           aria-label="Last247 home"
         >
-          <span className="grid h-7 w-7 place-items-center rounded-lg border-2 border-ink bg-yellow font-display text-[11px] font-bold text-[#111]">
+          <span className="grid h-6 w-6 place-items-center rounded-lg bg-yellow font-display text-[10px] font-bold text-[#111]">
             24
           </span>
           <span className="font-display text-sm font-bold tracking-wider">
@@ -49,7 +49,7 @@ export default function Navbar() {
             type="button"
             onClick={toggleTheme}
             aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-            className="grid h-8 w-8 place-items-center rounded-lg border-2 border-ink bg-frost-soft transition hover:-translate-y-0.5 hover:shadow-[2px_2px_0_0_var(--ink)]"
+            className="grid h-8 w-8 place-items-center rounded-full border border-ink/10 bg-frost-soft transition hover:-translate-y-0.5 hover:bg-yellow"
           >
             {darkMode ? (
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

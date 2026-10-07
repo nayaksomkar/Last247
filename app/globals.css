@@ -10,21 +10,28 @@
   --ink: #111111;
   --muted: #6d6a63;
 
-  --blue: #4d7cfe;
-  --pink: #f24b9b;
-  --yellow: #ffd84d;
-  --green: #63d471;
-  --orange: #ff8a3d;
-  --lavender: #a78bfa;
+  /* Soft pop pastels — fills for chips, blocks and highlights */
+  --pink: #f8d7e8;
+  --lavender: #b9a9f2;
+  --blue: #bfd8fe;
+  --mint: #c8ecd6;
+  --yellow: #ffe9a8;
+  --peach: #ffd9c4;
+
+  --shadow-card: 0 6px 24px rgba(17, 17, 17, 0.08);
+  --shadow-hover: 0 14px 34px rgba(17, 17, 17, 0.14);
 }
 
 .dark {
-  /* Dark mode: ink flips to ivory so outlines + offset shadows stay graphic */
+  /* Dark mode: ink flips to ivory so typography stays graphic */
   --paper: #14120f;
   --frost: rgba(43, 40, 37, 0.72);
   --frost-soft: rgba(255, 255, 255, 0.06);
   --ink: #f7f5ef;
   --muted: #a5a19a;
+
+  --shadow-card: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --shadow-hover: 0 14px 36px rgba(0, 0, 0, 0.55);
 }
 
 @theme inline {
@@ -34,15 +41,24 @@
   --color-ink: var(--ink);
   --color-muted: var(--muted);
 
-  --color-blue: var(--blue);
   --color-pink: var(--pink);
-  --color-yellow: var(--yellow);
-  --color-green: var(--green);
-  --color-orange: var(--orange);
   --color-lavender: var(--lavender);
+  --color-blue: var(--blue);
+  --color-mint: var(--mint);
+  --color-yellow: var(--yellow);
+  --color-peach: var(--peach);
 
   --font-display: var(--font-display);
   --font-body: var(--font-body);
+}
+
+/* Soft shadow utilities — swap per theme via the vars above */
+@utility soft-shadow {
+  box-shadow: var(--shadow-card);
+}
+
+@utility soft-shadow-lg {
+  box-shadow: var(--shadow-hover);
 }
 
 * {
@@ -56,11 +72,6 @@ html {
 body {
   margin: 0;
   background-color: var(--paper);
-  /* ponytail: subtle paper-grid texture, one gradient pair, no images */
-  background-image:
-    linear-gradient(rgba(17, 17, 17, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(17, 17, 17, 0.04) 1px, transparent 1px);
-  background-size: 34px 34px;
   color: var(--ink);
   font-family:
     var(--font-body),
@@ -70,12 +81,6 @@ body {
   transition:
     background-color 300ms ease,
     color 300ms ease;
-}
-
-.dark body {
-  background-image:
-    linear-gradient(rgba(247, 245, 239, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(247, 245, 239, 0.05) 1px, transparent 1px);
 }
 
 ::selection {
@@ -94,8 +99,8 @@ body {
   }
 }
 
-/* Very light bob for a single hero decoration; rotation comes from
-   --drift-rot so the keyframe owns the whole transform. */
+/* Very light bob for floating geometry; rotation comes from --drift-rot
+   so the keyframe owns the whole transform. */
 @keyframes drift {
   from {
     transform: rotate(var(--drift-rot, 0deg)) translateY(0);
